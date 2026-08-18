@@ -194,9 +194,30 @@ better-written disclosure.
 The deterministic half is `reference/engine.js`: 8-gram overlap, the lexical
 list, contraction rate, sentence-length stdev, comma density, specifics count,
 hashtag counts, the lock read. Quote its JSON verbatim into `gate-report.md`.
-The model owns the judgments: antithesis, unearned rule of three, restating
-close, hedged openers, the announcement shape, and the clearance read. Zero
-tolerance is a promise only the deterministic half can keep.
+The model owns the judgments: the open forms of antithesis, unearned rule of
+three, parallel bullets, restating close, the open category of hedged openers,
+the announcement shape, a testimonial quote, all-contractions, and the clearance
+read. Zero tolerance is a promise only the deterministic half can keep.
+
+**`reference/ai-tells.md` is the working list, and every tell there has an id.**
+Tag `gate-report.md` with those ids, not with prose, because PRD section 13.2
+step 5 asks for a per-tell tag list and a tag has to match something. The ids
+are what `gate-fixtures/expected.md` references and what the ownership table in
+`engine.js` keys on, and `node reference/engine.js gate --tells` fails when the
+file and the table disagree. Run the four `gate` modes whenever `ai-tells.md`
+changes:
+
+```
+node reference/engine.js gate                      # recall over gate-fixtures/
+node reference/engine.js gate --negative <profile> # fires on their own writing
+node reference/engine.js gate --hooks              # hooks.md example lines
+node reference/engine.js gate --tells              # the file against the table
+```
+
+Retiring a rule is a real move, not a defeat. A tell that fires on this person's
+own writing gets struck through in `ai-tells.md` with the date and the reason. It
+stops firing and stays visible, because a wrong rule costs a rewrite of good
+writing on every future draft forever.
 
 ### Step 8: log and ship
 

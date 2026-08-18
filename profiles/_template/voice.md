@@ -26,6 +26,19 @@ measured_from: <what was pasted, e.g. 3 slack messages + 1 email>
 <!-- verbatim, each marked source: pasted. these are the diff corpus until
      20 engine posts exist. -->
 
+```
+- source: pasted
+  kind: <slack message | email | linkedin post | doc | dm>
+  pasted_at: <YYYY-MM-DD>
+  text: |
+    <verbatim, unedited, line breaks and typos kept>
+```
+
+Same shape as `shipped-history.md` on purpose. `engine.js gate --negative`
+reads these to measure how often the language gate fires on this person's own
+writing, and zero is the pass bar, so a sample edited on the way in makes that
+number a lie. Paste it wrong rather than paste it tidy.
+
 ## Habits
 
 <!-- observed, not asserted. profanity, questions, how they handle lists,

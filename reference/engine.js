@@ -20,6 +20,10 @@
 //   node reference/engine.js lexical <draft.md> [--short]
 //   node reference/engine.js stats   <draft.md> [profile-dir]
 //   node reference/engine.js locks   <profile-dir>
+//   node reference/engine.js gate    [fixtures-dir]
+//   node reference/engine.js gate    --negative <profile-dir>
+//   node reference/engine.js gate    --hooks [hooks.md]
+//   node reference/engine.js gate    --tells [ai-tells.md]
 //   node reference/engine.js test
 //
 // Every subcommand prints one JSON object to stdout and exits 0. Exit 1 means
@@ -61,10 +65,65 @@ const PAIR_LOCK_DAYS = 30;
 const ROTATION_FLOOR = 11;
 // Section 9: hashtag stacks at the bottom. Three is a stack.
 const HASHTAG_STACK = 3;
+// Section 9: zero contractions is a tell. Below this many words it is not
+// evidence of anything, so a two-line post does not fire it.
+const CONTRACTION_FLOOR_WORDS = 40;
+// Section 9: "every paragraph the same number of lines". Three paragraphs is
+// the fewest that shows a pattern rather than a coincidence.
+const UNIFORM_PARA_MIN = 3;
+// A one-line-paragraph post is a documented human habit, named in
+// inspiration.md as a usable extraction, so uniformity only reads as machine
+// output at two lines and above.
+const UNIFORM_PARA_LINES = 2;
 // Section 9's voice floor: flag at more than 25% below the value in voice.md.
 const VOICE_FLOOR = 0.75;
 // Section 13.1: the diff corpus is the last 20 shipped pieces.
 const PRIOR_LIMIT = 20;
+// Section 13.2 step 4: gate-fixtures/ holds 20 known-AI posts.
+const FIXTURE_COUNT = 20;
+
+// Section 9's tells, one row each, with the half that owns it.
+// `reference/ai-tells.md` carries the prose: what fires, how it gets rewritten,
+// and whether it has been struck. This table carries the ownership and the tag
+// the gate report prints, and `gate --tells` is what keeps the two in step.
+//
+// owner 'engine' means a literal or a count, and section 9's "zero tolerance"
+// is a promise this file keeps for it. 'model' means a judgment, and the tag is
+// null because nothing here can produce it. 'both' means the forms section 9
+// names by name are caught here and the open category is not, which is the
+// honest reading of section 9's split rather than a softening of it.
+const TELLS = [
+  { id: 'antithesis', owner: 'both', tag: 'antithesis' },
+  { id: 'unearned-rule-of-three', owner: 'model', tag: null },
+  { id: 'parallel-bullets', owner: 'model', tag: null },
+  { id: 'rhetorical-fragment', owner: 'engine', tag: 'rhetorical-fragment' },
+  { id: 'restating-close', owner: 'model', tag: null },
+  { id: 'engagement-bait-close', owner: 'engine', tag: 'engagement-bait-close' },
+  { id: 'thinking-opener', owner: 'engine', tag: 'thinking-opener' },
+  { id: 'uniform-paragraphs', owner: 'engine', tag: 'uniform-paragraphs' },
+  { id: 'em-dash', owner: 'engine', tag: 'em-dash' },
+  { id: 'en-dash', owner: 'engine', tag: 'en-dash' },
+  { id: 'semicolon', owner: 'engine', tag: 'semicolon' },
+  { id: 'banned-lexicon', owner: 'engine', tag: 'banned' },
+  { id: 'not-only-but-also', owner: 'engine', tag: 'not-only-but-also' },
+  { id: 'hedged-opener', owner: 'both', tag: 'hedged-opener' },
+  { id: 'announcement-phrase', owner: 'engine', tag: 'announcement' },
+  { id: 'at-company-we-believe', owner: 'engine', tag: 'at-company-we-believe' },
+  { id: 'we-with-no-human', owner: 'engine', tag: 'we-with-no-human' },
+  { id: 'announcement-shape', owner: 'model', tag: null },
+  { id: 'testimonial-quote', owner: 'model', tag: null },
+  { id: 'no-fragments', owner: 'engine', tag: 'no-fragments' },
+  { id: 'no-long-sentence', owner: 'engine', tag: 'no-long-sentence' },
+  { id: 'zero-contractions', owner: 'engine', tag: 'zero-contractions' },
+  { id: 'all-contractions', owner: 'model', tag: null },
+  { id: 'emoji-bullets', owner: 'engine', tag: 'emoji-bullets' },
+  { id: 'hashtag-stack', owner: 'engine', tag: 'hashtag-stack' },
+  { id: 'title-case-header', owner: 'engine', tag: 'title-case-header' },
+  { id: 'specifics-floor', owner: 'engine', tag: 'specifics-floor' },
+  { id: 'voice-floor', owner: 'engine', tag: 'voice-floor' },
+  { id: 'clearance', owner: 'model', tag: null },
+  { id: 'private-terms', owner: 'engine', tag: 'private-terms' },
+];
 
 // Section 9's lexical list, verbatim. Single words match on a word boundary
 // and allow suffixes, so "leveraged" and "unpacking" both fire. Phrases match
@@ -85,9 +144,54 @@ const ANNOUNCEMENT = [
   'join us', 'stay tuned', 'more in the comments',
 ];
 
+// Section 9's remaining literal phrases. Separate from BANNED because each
+// carries its own tag: gate-report.md is read per tell, and "banned" printed
+// against a hedged opener says nothing about what to change.
+//
+// Position is not checked. Section 9 writes two of these as "opening with" and
+// "ending on", but the phrase is the tell wherever it sits, and a position test
+// only adds a way to miss one.
+const PHRASED = [
+  { term: "i've been thinking a lot about", tag: 'thinking-opener' },
+  { term: 'in many ways,', tag: 'hedged-opener' },
+  { term: "it's worth noting that", tag: 'hedged-opener' },
+  { term: 'thoughts?', tag: 'engagement-bait-close' },
+  { term: "what's your take?", tag: 'engagement-bait-close' },
+  { term: 'the result?', tag: 'rhetorical-fragment' },
+  { term: 'the kicker?', tag: 'rhetorical-fragment' },
+  { term: "here's the thing", tag: 'rhetorical-fragment' },
+];
+
 const PATTERNS = [
-  { tag: 'not-only-but-also', re: /\bnot only\b[\s\S]{0,80}?\bbut also\b/gi },
-  { tag: 'at-company-we-believe', re: /\bat [A-Z][\w.&' ]{1,30}, we believe\b/g },
+  // "but also" is not how the second half actually lands. A model writes "but
+  // we also" and "but they also" more often than the adjacent form section 9
+  // quotes, and an adjacent-only match catches the version nobody writes. The
+  // "not only" anchor is what carries the precision here.
+  { tag: 'not-only-but-also', re: /\bnot only\b[\s\S]{0,80}?\bbut\b[\w\s]{0,14}?\balso\b/gi },
+  // Case-insensitive on "at", capital still required on the company. This tell
+  // opens a sentence nearly every time it appears, so a lowercase-only match
+  // missed the only position it occurs in. The capital after it is what
+  // separates a company from a preposition.
+  { tag: 'at-company-we-believe', re: /\b[Aa]t [A-Z][\w.&' ]{1,30}, we believe\b/g },
+
+  // Section 9's antithesis, in the two forms it names. The open form stays with
+  // the model per section 9's split, and section 13.2's CI check over hooks.md
+  // names this tell by name, so the named forms have to be a regex rather than
+  // an intention.
+  //
+  // Both require the second clause to open on a determiner. "I'm not sure, it's
+  // complicated" is a sentence a person writes and this tell is not in it;
+  // section 9's own maintenance rule is that precision can only decay, so a
+  // miss the model can still catch costs less than a rewrite of good writing on
+  // every future draft forever.
+  // "not" is its own word and "n't" is glued to the verb, so there is no one
+  // word boundary that reaches both. Spelling out the two forms is the whole
+  // fix; a leading \b silently matches only the first, which is the half a
+  // model writes least often.
+  { tag: 'antithesis',
+    re: /(?:\bnot|n['\u2019]t)\s+(?:just\s+|only\s+|really\s+)?[^,.!?\n]{2,70},\s*(?:it|this|that|they)\s?(?:['\u2019]s|s|\s?is|\s?are)\s+(?:a|an|the|about|that|how|why|what)\b/gi },
+  { tag: 'antithesis',
+    re: /\b(?:is|are|was|were)n(?:['\u2019])t\s+the\s+(?:problem|issue|point|hard part)\.\s+[A-Z][^.!?\n]{1,60}\s(?:is|are)\./g },
 ];
 
 // Possessive 's and contracted 's are the same two characters. This is the
@@ -251,19 +355,36 @@ function inventoryItems(text) {
   return items;
 }
 
-// shipped-history.md entries. "text: |" blocks under "- posted_at:".
-function shippedHistory(text) {
+// "text: |" blocks under a "- <leadKey>:" line. shipped-history.md and
+// voice.md's Samples section are the same shape on purpose: both hold verbatim
+// human text, and section 13.2 step 4's negative control reads both.
+function pastedBlocks(text, leadKey) {
   const out = [];
-  const blocks = stripFences(text).split(/\n(?=\s*-\s+posted_at:)/);
+  const head = new RegExp('^\\s*-\\s+' + leadKey + ':');
+  const blocks = stripFences(text).split(new RegExp('\\n(?=\\s*-\\s+' + leadKey + ':)'));
   for (const block of blocks) {
-    if (!/^\s*-\s+posted_at:/.test(block)) continue;
-    const at = (block.match(/posted_at:\s*(.*)/) || [, ''])[1].trim();
+    if (!head.test(block)) continue;
+    const label = (block.match(new RegExp(leadKey + ':\\s*(.*)')) || [, ''])[1].trim();
     const m = block.match(/\n\s*text:\s*\|\s*\r?\n([\s\S]*?)(?=\n\s*\w+:\s|\n\s*```|$)/);
     if (!m) continue;
+    const kind = (block.match(/\n\s*kind:\s*(.*)/) || [, ''])[1].trim();
     const body = m[1].split(/\r?\n/).map(l => l.replace(/^\s{0,6}/, '')).join('\n').trim();
-    if (body) out.push({ posted_at: at, text: body });
+    if (body) out.push({ label, kind, text: body });
   }
   return out;
+}
+
+// shipped-history.md entries, named by posted_at.
+function shippedHistory(text) {
+  return pastedBlocks(text, 'posted_at')
+    .map(b => ({ posted_at: b.label, text: b.text }));
+}
+
+// voice.md's pasted samples. Section 9's precedence rests on this file, and
+// section 13.2 step 4 measures the gate's false-positive rate against exactly
+// these, so an unparseable Samples section retires the whole negative control.
+function voiceSamples(text) {
+  return pastedBlocks(text, 'source').filter(b => b.label === 'pasted');
 }
 
 // voice.md's four frozen measurements. Section 6, frozen at setup.
@@ -469,13 +590,15 @@ function scan(text, term, tag) {
   return out;
 }
 
-function lexical(draftPath, opts) {
-  const draft = readFile(draftPath);
+// Takes text rather than a path, because `gate` scans a fixture corpus and a
+// profile's pasted samples, and neither has a run directory to hold brief.md.
+function lexicalText(draft, opts, privateTerms, briefFound) {
   const quotes = quotedRanges(draft);
   const hits = [];
 
   for (const term of BANNED) hits.push(...scan(draft, term, 'banned'));
   for (const term of ANNOUNCEMENT) hits.push(...scan(draft, term, 'announcement'));
+  for (const ph of PHRASED) hits.push(...scan(draft, ph.term, ph.tag));
   for (const p of PATTERNS) {
     let m;
     p.re.lastIndex = 0;
@@ -518,26 +641,33 @@ function lexical(draftPath, opts) {
         hits.push({ tag: 'title-case-header', term: t, at: offset, match: t });
       }
     }
+
+    // Section 9: emoji used as bullet points. Matched by Unicode property so
+    // this file stays free of literal emoji, the same reason the dashes above
+    // are escapes.
+    if (/^\s*[-*]?\s*\p{Extended_Pictographic}/u.test(line) && w.length > 1) {
+      hits.push({ tag: 'emoji-bullets', term: 'emoji bullet', at: offset, match: t.slice(0, 40) });
+    }
+
+    // Section 9: the one-word or two-word rhetorical paragraph. PHRASED above
+    // holds the three section 9 names; this is the shape.
+    //
+    // ponytail: a numeral anywhere on the line disqualifies it, so a date used
+    // as a section marker ("March 2026:") is not read as rhetoric. The ceiling
+    // is a two-word rhetorical line containing a number, which the model still
+    // owns.
+    if (t && w.length <= 2 && /[?:]$/.test(t) && /[A-Za-z]/.test(t) &&
+        !/\d/.test(t) && !/^#/.test(t) && !/^[-*>]/.test(t)) {
+      const isPhrased = PHRASED.some(ph => t.toLowerCase().startsWith(ph.term.slice(0, 12)));
+      if (!isPhrased) {
+        hits.push({ tag: 'rhetorical-fragment', term: t, at: offset, match: t });
+      }
+    }
     offset += line.length + 1;
   }
 
   const hashtags = draft.match(/(^|\s)#[A-Za-z][\w]*/g) || [];
 
-  // Section 9: a draft containing any literal string in brief.md's
-  // private_terms is rejected and redrafted, not rewritten. brief.md sits
-  // beside draft.md in the run directory.
-  const briefPath = path.join(path.dirname(draftPath), 'brief.md');
-  const briefFound = fs.existsSync(briefPath);
-  const brief = frontMatter(readIfPresent(briefPath));
-  // A bare `private_terms: Northwind, 41%` is the drift a model actually
-  // writes, and reading it as absent leaves this guarding nothing on exactly
-  // the material section 9 says a tired human approves at 8am.
-  const rawTerms = brief.private_terms;
-  const privateTerms = Array.isArray(rawTerms)
-    ? rawTerms
-    : (rawTerms
-        ? String(rawTerms).replace(/^\[|\]$/g, '').split(',').map(s => s.trim()).filter(Boolean)
-        : []);
   const privateHits = [];
   const lower = draft.toLowerCase();
   for (const term of privateTerms) {
@@ -572,6 +702,25 @@ function lexical(draftPath, opts) {
   };
 }
 
+// Section 9: a draft containing any literal string in brief.md's private_terms
+// is rejected and redrafted, not rewritten. brief.md sits beside draft.md in
+// the run directory.
+function lexical(draftPath, opts) {
+  const briefPath = path.join(path.dirname(draftPath), 'brief.md');
+  const briefFound = fs.existsSync(briefPath);
+  const brief = frontMatter(readIfPresent(briefPath));
+  // A bare `private_terms: Northwind, 41%` is the drift a model actually
+  // writes, and reading it as absent leaves this guarding nothing on exactly
+  // the material section 9 says a tired human approves at 8am.
+  const rawTerms = brief.private_terms;
+  const privateTerms = Array.isArray(rawTerms)
+    ? rawTerms
+    : (rawTerms
+        ? String(rawTerms).replace(/^\[|\]$/g, '').split(',').map(s => s.trim()).filter(Boolean)
+        : []);
+  return lexicalText(readFile(draftPath), opts, privateTerms, briefFound);
+}
+
 // -------------------------------------------------------------------- stats
 
 function contractionCount(tokens) {
@@ -593,10 +742,9 @@ function contractionCount(tokens) {
 // Counted over the split sentences rather than the raw text, so a numbered
 // list does not clear the floor on its own numbering. That draft is the exact
 // abstraction section 9 says cannot be patched into an instance.
-function countSpecifics(text) {
-  const ss = sentences(text);
-  let n = (ss.join(' ').match(/\$\d[\d,.]*|\b\d[\d,.]*%?\b/g) || []).length;
-  for (const s of ss) {
+function capitalizedMid(text) {
+  let n = 0;
+  for (const s of sentences(text)) {
     const w = s.split(/\s+/).filter(Boolean);
     for (let i = 1; i < w.length; i++) {
       const t = w[i].replace(/^[^A-Za-z]+/, '').replace(/[^A-Za-z]+$/, '');
@@ -604,6 +752,20 @@ function countSpecifics(text) {
     }
   }
   return n;
+}
+
+function countSpecifics(text) {
+  const joined = sentences(text).join(' ');
+  const numerals = (joined.match(/\$\d[\d,.]*|\b\d[\d,.]*%?\b/g) || []).length;
+  return numerals + capitalizedMid(text);
+}
+
+// Paragraphs are blank-line separated, and the count is lines each holds.
+// Section 9's tell is that every one holds the same number.
+function paragraphLines(text) {
+  return text.split(/\r?\n\s*\r?\n/)
+    .map(b => b.split(/\r?\n/).filter(l => l.trim()).length)
+    .filter(n => n > 0);
 }
 
 function measure(text) {
@@ -619,13 +781,18 @@ function measure(text) {
     contraction_rate: total ? round((contractionCount(tokens) / total) * 100, 2) : 0,
     comma_density: total ? round(((text.match(/,/g) || []).length / total) * 100, 2) : 0,
     specifics: countSpecifics(text),
+    proper_nouns: capitalizedMid(text),
+    first_person_plural: (text.match(/\b(?:we|us|our|ours|we['\u2019]re|we['\u2019]ve)\b/gi) || []).length,
+    paragraph_lines: paragraphLines(text),
     shortest_sentence: lengths.length ? Math.min(...lengths) : 0,
     longest_sentence: lengths.length ? Math.max(...lengths) : 0,
   };
 }
 
-function stats(draftPath, profile) {
-  const m = measure(readFile(draftPath));
+// Takes text and an already-read baseline, for the same reason lexicalText
+// does: `gate` measures a corpus, not a run directory.
+function statsText(text, baseline) {
+  const m = measure(text);
   const flags = [];
 
   // Section 9's specifics floor. A draft naming nothing is redrafted, not
@@ -634,10 +801,33 @@ function stats(draftPath, profile) {
     flags.push({ rule: 'specifics-floor', action: 'redraft', detail: 'no named people, companies, dates, or numerals' });
   }
 
+  // Section 9: every paragraph the same number of lines.
+  const pl = m.paragraph_lines;
+  if (pl.length >= UNIFORM_PARA_MIN && pl[0] >= UNIFORM_PARA_LINES &&
+      pl.every(n => n === pl[0])) {
+    flags.push({
+      rule: 'uniform-paragraphs', action: 'rewrite',
+      detail: pl.length + ' paragraphs of ' + pl[0] + ' lines each',
+    });
+  }
+
+  // Section 9: first-person plural with no named human anywhere in the post.
+  //
+  // ponytail: "no named human" is approximated by no capitalized word in any
+  // non-sentence-initial position, which is the same rule the specifics floor
+  // uses. It under-fires, because a post naming Acme and no person passes here.
+  // A capitalized word is not evidence of a person and section 9 hands the
+  // announcement shape to the model anyway, so this is the floor and the model
+  // reads the rest.
+  if (m.first_person_plural > 0 && m.proper_nouns === 0) {
+    flags.push({
+      rule: 'we-with-no-human', action: 'rewrite',
+      detail: m.first_person_plural + ' first-person-plural uses and nobody named',
+    });
+  }
+
   // Section 9's voice floor.
-  let baseline = null;
-  if (profile) {
-    baseline = voiceMeasures(readIfPresent(path.join(profile, 'voice.md')));
+  if (baseline) {
     for (const key of ['sentence_length_stdev', 'contraction_rate']) {
       const b = baseline[key];
       if (b === null || b === 0) continue;
@@ -649,14 +839,27 @@ function stats(draftPath, profile) {
       }
     }
   }
+  // Section 9: zero contractions is a tell on its own, not only as a distance
+  // below a baseline. voice.md wins: a person whose measured rate is 0 writes
+  // that way, and the gate records the override rather than rewriting them
+  // into contractions they never use.
+  if (m.contraction_rate === 0 && m.words >= CONTRACTION_FLOOR_WORDS &&
+      !(baseline && baseline.contraction_rate === 0)) {
+    flags.push({
+      rule: 'zero-contractions', action: 'rewrite',
+      detail: 'no contraction in ' + m.words + ' words',
+      override_available: baseline ? 'voice.md records ' + baseline.contraction_rate : 'no baseline on file',
+    });
+  }
+
   const haveBaseline = baseline && (baseline.sentence_length_stdev !== null || baseline.contraction_rate !== null);
   if (!haveBaseline) {
     // Section 9's fallback where no samples exist.
     if (m.sentences && m.shortest_sentence >= 6) {
-      flags.push({ rule: 'voice-floor-absolute', action: 'flag', detail: 'no sentence under 6 words' });
+      flags.push({ rule: 'no-fragments', action: 'flag', detail: 'no sentence under 6 words' });
     }
     if (m.sentences && m.longest_sentence <= 25) {
-      flags.push({ rule: 'voice-floor-absolute', action: 'flag', detail: 'no sentence over 25 words' });
+      flags.push({ rule: 'no-long-sentence', action: 'flag', detail: 'no sentence over 25 words' });
     }
   }
 
@@ -668,6 +871,13 @@ function stats(draftPath, profile) {
     baseline_source: haveBaseline ? 'voice.md' : 'none, absolute floors applied',
     flags,
   };
+}
+
+function stats(draftPath, profile) {
+  const baseline = profile
+    ? voiceMeasures(readIfPresent(path.join(profile, 'voice.md')))
+    : null;
+  return statsText(readFile(draftPath), baseline);
 }
 
 // -------------------------------------------------------------------- locks
@@ -741,6 +951,229 @@ function locks(profile) {
     // drops it. Matching the three.
     run_start_line: unlocked.length + ' unlocked anchors, ' + runway +
       ' posts of runway at current cadence.',
+  };
+}
+
+// --------------------------------------------------------------------- gate
+
+// Section 13.2 step 4. Four questions in one subcommand, because they are read
+// together and three of them share one scan:
+//
+//   gate [dir]              does the gate catch known-AI writing (recall)
+//   gate --negative <prof>  does it stay off this person's own writing
+//   gate --hooks [file]     does the hook library ship a line the gate rewrites
+//   gate --tells [file]     the ownership table, and whether ai-tells.md agrees
+//
+// Recall counts engine-owned tells only. Scoring a model-judged tell as caught
+// because a fixture happens to list it would report a number this file did not
+// earn, which is the self-witnessing problem section 13.1 exists to stop.
+
+const tellById = new Map(TELLS.map(x => [x.id, x]));
+
+function firedTags(text, baseline, short) {
+  const lx = lexicalText(text, { short: short !== false }, [], false);
+  const st = statsText(text, baseline);
+  const tags = new Set();
+  for (const h of lx.hits) tags.add(h.tag);
+  if (lx.hashtags.stack) tags.add('hashtag-stack');
+  for (const f of st.flags) tags.add(f.rule);
+  return { tags: [...tags], rewrite_count: lx.rewrite_count, protected: lx.not_rewritten_quoted_or_factual.length };
+}
+
+function gateFixtures(dir) {
+  // Rows are `NN: tell-id, tell-id  # why`. The expected catch lives in one
+  // manifest rather than in each fixture's front matter, so a fixture file is
+  // only ever the post: authors stripped means nothing else in there either.
+  const manifest = readIfPresent(path.join(dir, 'expected.md'));
+  const expected = new Map();
+  const re = /^(\d{2}):[ \t]*([a-z0-9,\- ]+?)(?:[ \t]+#.*)?[ \t]*$/gm;
+  let m;
+  while ((m = re.exec(manifest)) !== null) {
+    expected.set(m[1], m[2].split(',').map(s => s.trim()).filter(Boolean));
+  }
+
+  const files = fs.existsSync(dir)
+    ? fs.readdirSync(dir).filter(f => /^\d{2}\.md$/.test(f)).sort()
+    : [];
+  const errors = [];
+  const per = [];
+  let owed = 0;
+  let caught = 0;
+
+  for (const f of files) {
+    const want = expected.get(f.slice(0, 2));
+    if (!want) { errors.push(f + ': no row in expected.md'); continue; }
+    const got = firedTags(readFile(path.join(dir, f)), null, true);
+    const wantTags = new Set();
+    const engineWanted = [];
+    const judged = [];
+    const missed = [];
+    for (const id of want) {
+      const tell = tellById.get(id);
+      if (!tell) { errors.push(f + ': unknown tell "' + id + '"'); continue; }
+      if (!tell.tag) { judged.push(id); continue; }
+      wantTags.add(tell.tag);
+      engineWanted.push(id);
+      if (!got.tags.includes(tell.tag)) missed.push(id);
+    }
+    owed += engineWanted.length;
+    caught += engineWanted.length - missed.length;
+    per.push({
+      fixture: f,
+      expected_engine: engineWanted,
+      expected_judged: judged,
+      missed,
+      also_fired: got.tags.filter(x => !wantTags.has(x)),
+    });
+  }
+
+  for (const id of expected.keys()) {
+    if (!files.includes(id + '.md')) errors.push(id + '.md: listed in expected.md and absent');
+  }
+
+  return {
+    check: 'gate',
+    mode: 'fixtures',
+    pass: errors.length === 0 && owed > 0 && caught === owed && files.length === FIXTURE_COUNT,
+    fixtures: files.length,
+    fixtures_required: FIXTURE_COUNT,
+    deterministic_expected: owed,
+    deterministic_caught: caught,
+    judged_expected: per.reduce((n, r) => n + r.expected_judged.length, 0),
+    errors,
+    per_fixture: per,
+    note: 'a judged tell is the model half of section 9 and is listed, never scored.',
+  };
+}
+
+function gateNegative(profile) {
+  const voiceText = readIfPresent(path.join(profile, 'voice.md'));
+  const baseline = voiceMeasures(voiceText);
+  const corpus = voiceSamples(voiceText).map(s => ({ from: 'voice.md', ...s }))
+    .concat(pastedBlocks(readIfPresent(path.join(profile, 'shipped-history.md')), 'posted_at')
+      // Spread first, override after. pastedBlocks returns a kind of '' when
+      // the block does not declare one, and a trailing spread hands that empty
+      // string straight over the top of this line: every shipped post stops
+      // being a post and the absence checks quietly never run on any of them.
+      .map(s => ({ ...s, from: 'shipped-history.md', kind: 'linkedin post' })));
+
+  // Section 13.2's bar is "zero rewrites on the person's own samples", and the
+  // wording is load bearing. A specifics-floor hit is a redraft and a voice
+  // floor is a flag; neither edits a word the person wrote, and neither is
+  // evidence that a rule is wrong. Only rewrites count against the control, and
+  // the rest is reported so it stays visible.
+  const fires = [];
+  const flagged = [];
+  for (const s of corpus) {
+    const isPost = s.kind === 'linkedin post';
+    // Section 9 bans semicolons in short posts only, so an email or a slack
+    // message is not scanned for them. Firing there would strike a live rule
+    // over a sample the rule never claimed.
+    const lx = lexicalText(s.text, { short: isPost }, [], false);
+    const name = s.from + (s.label ? ':' + s.label : '');
+    if (lx.rewrite_count > 0 || lx.hashtags.stack) {
+      fires.push({
+        sample: name,
+        kind: s.kind || 'unspecified',
+        fired: [...new Set(lx.hits.map(h => h.tag))],
+        rewrites: lx.rewrite_count,
+      });
+    }
+    // The absence checks measure a whole post: paragraph uniformity, a
+    // specifics count, a distance from a baseline. A three-line slack message
+    // is not a post and running them on one measures the sample rather than
+    // the rule.
+    if (!isPost) continue;
+    for (const f of statsText(s.text, baseline).flags) {
+      if (f.action === 'rewrite') {
+        fires.push({ sample: name, kind: s.kind, fired: [f.rule], rewrites: 1 });
+      } else {
+        flagged.push({ sample: name, rule: f.rule, action: f.action });
+      }
+    }
+  }
+
+  return {
+    check: 'gate',
+    mode: 'negative-control',
+    // "fires: 0" over an empty corpus reads as a clean pass. Say which it was.
+    corpus: corpus.length ? 'present' : 'empty, no pasted sample on file',
+    samples: corpus.length,
+    posts: corpus.filter(s => s.kind === 'linkedin post').length,
+    pass: corpus.length > 0 && fires.length === 0,
+    fires,
+    also_flagged: flagged,
+    baseline,
+    bar: 'section 13.2 step 4: zero rewrites on the person\'s own samples. Every rewrite is a rule bug, struck per section 9, not a prose bug. A redraft or a flag is listed under also_flagged and does not fail the control, because neither edits a word the person wrote.',
+    reads: 'voice.md source: pasted blocks and shipped-history.md. Absence checks run on kind: linkedin post only. The inspiration corpus is not here: section 6 discards that text at the end of setup, so its half of the control runs once, at setup, before the discard.',
+  };
+}
+
+function gateHooks(file) {
+  // Section 13.2 step 4: every example line in hooks.md is checked against the
+  // gate. A pattern the gate would rewrite cannot ship in the library, or the
+  // user watches the tool argue with itself on run two.
+  //
+  // An example line is a blockquote line. hooks.md does not exist until step 5,
+  // so this reports blocked rather than passing on an empty scan.
+  if (!fs.existsSync(file)) {
+    return {
+      check: 'gate', mode: 'hooks', pass: false,
+      hooks_file: 'absent', example_lines: 0, violations: [],
+      blocked_on: file + ', built at section 13 step 5. This check goes live the day it lands.',
+      convention: 'an example line is a line starting with "> ".',
+    };
+  }
+  const lines = readFile(file).split(/\r?\n/);
+  const violations = [];
+  let n = 0;
+  lines.forEach((line, i) => {
+    if (!/^\s*>\s+\S/.test(line)) return;
+    n++;
+    const body = line.replace(/^\s*>\s+/, '');
+    const got = firedTags(body, null, true);
+    // The absence checks measure a whole post. One quoted hook line has no
+    // paragraphs, no baseline and nothing to name, so they are not violations
+    // here, only the presence tells are.
+    const real = got.tags.filter(x => !['specifics-floor', 'no-fragments',
+      'no-long-sentence', 'zero-contractions', 'we-with-no-human',
+      'uniform-paragraphs'].includes(x));
+    if (real.length) violations.push({ line: i + 1, text: body, fired: real });
+  });
+  return {
+    check: 'gate', mode: 'hooks',
+    pass: n > 0 && violations.length === 0,
+    hooks_file: 'found',
+    example_lines: n,
+    violations,
+    convention: 'an example line is a line starting with "> ".',
+  };
+}
+
+function gateTells(file) {
+  const doc = readIfPresent(file);
+  const inDoc = [];
+  const re = /^###\s+~{0,2}([a-z0-9-]+)~{0,2}\s*$/gm;
+  let m;
+  while ((m = re.exec(doc)) !== null) inDoc.push(m[1]);
+  const ids = TELLS.map(x => x.id);
+  const missingFromDoc = ids.filter(id => !inDoc.includes(id));
+  const missingFromCode = inDoc.filter(id => !ids.includes(id));
+  return {
+    check: 'gate', mode: 'tells',
+    // The doc check is redundant while TELLS holds anything: an absent file
+    // reports every id missing on its own. It stays because the day someone
+    // empties the table is the day this would report a clean pass on no file
+    // at all, and it costs nothing to keep.
+    pass: doc !== '' && !missingFromDoc.length && !missingFromCode.length,
+    ai_tells_md: doc ? 'found' : 'absent',
+    total: TELLS.length,
+    engine_owned: TELLS.filter(x => x.tag).length,
+    model_owned: TELLS.filter(x => !x.tag).length,
+    missing_from_ai_tells_md: missingFromDoc,
+    missing_from_engine_js: missingFromCode,
+    note: 'ai-tells.md carries the prose, this table carries the ownership. A tell in one and not the other is drift, and the engine-owned count is what section 9\'s zero tolerance actually covers.',
+    tells: TELLS,
   };
 }
 
@@ -1088,7 +1521,314 @@ function selfTest() {
     fs.mkdirSync(bare, { recursive: true });
     assert.strictEqual(locks(bare).shipped_pieces, 0, 'a fresh profile reads as zero, not an error');
 
-    return { check: 'test', pass: true, subcommands: ['overlap', 'lexical', 'stats', 'locks'] };
+    // ------------------------------------------------------ section 9's tells
+    //
+    // Every tell added at step 4 gets one assert. A tell in ai-tells.md that
+    // no test can see is a rule the gate claims and does not keep, and the two
+    // widened at step 4 were both live and inert until the fixture corpus made
+    // them fire on nothing.
+    const tellDir = path.join(root, 'tells');
+    const firedIn = (body, short) => {
+      const f = writeFixture(tellDir, 'draft.md', body);
+      const lx = lexical(f, { short: short !== false });
+      const st = stats(f, null);
+      const out = lx.hits.map(h => h.tag).concat(st.flags.map(x => x.rule));
+      if (lx.hashtags.stack) out.push('hashtag-stack');
+      return out;
+    };
+
+    // Section 9 names two antithesis forms. "not" stands alone and "n't" is
+    // glued to the verb, so one leading word boundary reaches only the first,
+    // and the glued one is the form a model writes most.
+    assert.ok(firedIn("It's not a process problem, it's a memory problem.\n").includes('antithesis'),
+      'the "it is not X, it is Y" form fires');
+    assert.ok(firedIn("This isn't just a tooling gap, it's a trust gap.\n").includes('antithesis'),
+      'and so does the contracted one, which no leading word boundary reaches');
+    assert.ok(firedIn('Speed isn' + APOS + 't the problem. Sequencing is.\n').includes('antithesis'),
+      'and the second form section 9 names, with a curly apostrophe');
+    assert.ok(!firedIn("I'm not sure, it's complicated.\n").includes('antithesis'),
+      'but a person saying they are unsure is not this tell: the second clause ' +
+      'has to open on a determiner or precision decays on every future draft');
+
+    assert.ok(firedIn('We shipped late.\n\nThe result?\n\nNobody noticed.\n').includes('rhetorical-fragment'),
+      'the named rhetorical fragment fires');
+    assert.ok(firedIn('We shipped late.\n\nWhy?\n\nNobody wrote it down.\n').includes('rhetorical-fragment'),
+      'and so does the shape, which is the half section 9 does not enumerate');
+    assert.ok(!firedIn('We shipped late.\n\nMarch 2026:\n\nNobody wrote it down.\n').includes('rhetorical-fragment'),
+      'a date used as a section marker is not rhetoric');
+
+    assert.ok(firedIn('Acme shipped in March.\nThoughts?\n').includes('engagement-bait-close'),
+      'engagement bait fires');
+    assert.ok(firedIn("I've been thinking a lot about pipelines.\n").includes('thinking-opener'),
+      'and the announcement that thinking occurred');
+    assert.ok(firedIn('In many ways, Acme was right.\n').includes('hedged-opener'),
+      'and a hedged opener');
+
+    // Section 9's announcement register. This one was inert from step 3 until
+    // the fixture corpus fired it on nothing: the tell opens a sentence nearly
+    // every time it appears, and a lowercase-only match never saw that.
+    assert.ok(firedIn('At Northwind, we believe data should work for people.\n')
+      .includes('at-company-we-believe'), 'sentence-initial "At <Company>, we believe" fires');
+    assert.ok(firedIn('Here at Northwind, we believe in shipping.\n')
+      .includes('at-company-we-believe'), 'and so does the mid-sentence position');
+
+    // Also inert from step 3. Section 9 quotes the adjacent form and a model
+    // writes "but we also", so an adjacent-only match caught the version
+    // nobody writes.
+    assert.ok(firedIn('Not only did we miss the cleanup, but we also missed the schema.\n')
+      .includes('not-only-but-also'), 'the drifted "but we also" form fires');
+    assert.ok(firedIn('Not only the cleanup but also the schema.\n')
+      .includes('not-only-but-also'), 'and the adjacent form section 9 quotes');
+
+    assert.ok(firedIn('Three lessons:\n\n\u{1F680} ship fast\n\u2705 write it down\n')
+      .includes('emoji-bullets'), 'an emoji opening a line is a bullet');
+
+    // Section 9: every paragraph the same number of lines. The two-line floor
+    // is the whole precision of this rule.
+    assert.ok(firedIn('one here\ntwo here\n\nthree here\nfour here\n\nfive here\nsix here\n')
+      .includes('uniform-paragraphs'), 'three paragraphs of two lines each fires');
+    assert.ok(!firedIn('Acme shipped.\n\nNobody noticed.\n\nThat was March.\n')
+      .includes('uniform-paragraphs'),
+      'but one-line paragraphs throughout is a habit inspiration.md names as usable');
+
+    // Section 9's texture pair, split at step 4. One tag covering both let a
+    // fixture expecting fragments pass on the sentence-length half instead.
+    const flat = 'Acme did not ship the integration in March 2026 because the team had not ' +
+      'agreed on the sequence of the work, and it is now the second quarter that has ' +
+      'passed without a decision from any of the people who were in that room.\n';
+    assert.ok(firedIn(flat).includes('zero-contractions'), 'no contraction in 40+ words fires');
+    assert.ok(firedIn(flat).includes('no-fragments'), 'and no sentence under 6 words');
+    assert.ok(!firedIn(flat).includes('no-long-sentence'), 'but that sentence is over 25 words');
+    assert.ok(!firedIn('It did not ship.\n').includes('zero-contractions'),
+      'and four words without a contraction is evidence of nothing');
+
+    // voice.md wins, per section 9's precedence. Someone who never contracts is
+    // not producing a tell by continuing not to.
+    const zeroCon = path.join(root, 'profiles', 'zerocon');
+    writeFixture(zeroCon, 'voice.md',
+      'avg_sentence_length: 20\nsentence_length_stdev: 8\ncontraction_rate: 0\nuses_fragments: no\n');
+    const zcDraft = writeFixture(tellDir, 'flat.md', flat);
+    assert.ok(!stats(zcDraft, zeroCon).flags.some(f => f.rule === 'zero-contractions'),
+      'a measured rate of 0 in voice.md overrides the zero-contraction tell');
+
+    assert.ok(firedIn('we grew 40% and we are proud of the whole team this quarter.\n')
+      .includes('we-with-no-human'), 'first-person plural naming nobody fires');
+    assert.ok(!firedIn('Acme grew 40% and we are proud of Dana for it.\n')
+      .includes('we-with-no-human'), 'and naming one person clears it');
+
+    // ------------------------------------------------------------- gate modes
+    //
+    // Section 13.2 step 4. The corpus that ships is the one under test, because
+    // a synthetic corpus would prove the runner and not the gate.
+    const gf = gateFixtures(path.join(__dirname, 'gate-fixtures'));
+    assert.strictEqual(gf.errors.length, 0, 'no fixture is unlisted and no listed tell is unknown');
+    assert.strictEqual(gf.fixtures, FIXTURE_COUNT, 'the corpus holds 20 posts');
+    assert.ok(gf.deterministic_expected > 0, 'and expects something deterministic of them');
+    assert.strictEqual(gf.deterministic_caught, gf.deterministic_expected,
+      'every engine-owned expected catch fires');
+    assert.strictEqual(gf.pass, true, 'so the corpus passes');
+
+    const noCorpus = gateFixtures(path.join(root, 'no-such-corpus'));
+    assert.strictEqual(noCorpus.pass, false,
+      'and an empty corpus fails rather than passing on nothing, which is the ' +
+      'shape "checked: 0" already got wrong once');
+
+    // ai-tells.md and the TELLS table have to name the same set, or the file
+    // documents a gate that is not the one running.
+    const tl = gateTells(path.join(__dirname, 'ai-tells.md'));
+    assert.strictEqual(tl.ai_tells_md, 'found', 'ai-tells.md ships');
+    assert.deepStrictEqual(tl.missing_from_ai_tells_md, [], 'every tell in the table is documented');
+    assert.deepStrictEqual(tl.missing_from_engine_js, [], 'and every documented tell is in the table');
+    assert.strictEqual(tl.total, TELLS.length, 'the count is the table');
+    assert.strictEqual(gateTells(path.join(root, 'nope.md')).pass, false,
+      'and an absent ai-tells.md is a failure, not a clean table');
+
+    // The negative control. Zero fires is the pass bar, and an empty corpus is
+    // not zero fires.
+    const negProfile = path.join(root, 'profiles', 'negative');
+    writeFixture(negProfile, 'voice.md',
+      'avg_sentence_length: 14\nsentence_length_stdev: 9\ncontraction_rate: 6\nuses_fragments: yes\n');
+    const negEmpty = gateNegative(negProfile);
+    assert.strictEqual(negEmpty.samples, 0, 'no sample is on file');
+    assert.strictEqual(negEmpty.pass, false, 'so the control passes on nothing and says so');
+    assert.strictEqual(negEmpty.corpus, 'empty, no pasted sample on file', 'by name');
+
+    writeFixture(negProfile, 'voice.md',
+      'avg_sentence_length: 14\nsentence_length_stdev: 9\ncontraction_rate: 6\nuses_fragments: yes\n\n' +
+      '## Samples\n\n' +
+      '```\n- source: pasted\n  kind: <slack message>\n  text: |\n    <verbatim>\n```\n\n' +
+      '- source: pasted\n  kind: slack message\n  text: |\n' +
+      "    it's the third time this week. nobody read the notes.\n" +
+      '    Dana found it in the end.\n');
+    const negClean = gateNegative(negProfile);
+    assert.strictEqual(negClean.samples, 1, 'the fenced schema is not a sample, the entry is');
+    assert.deepStrictEqual(negClean.fires, [], 'and ordinary writing fires nothing');
+    assert.strictEqual(negClean.pass, true, 'which is the pass bar');
+
+    // A sample that does fire has to be reported, or the control cannot find
+    // the rule bug it exists to find.
+    writeFixture(negProfile, 'shipped-history.md',
+      '- posted_at: 2025-11-02\n  text: |\n' +
+      "    Let's unpack this. It's not a tooling gap, it's a trust gap.\n" +
+      '    Dana said so in March.\n');
+    const negFires = gateNegative(negProfile);
+    assert.strictEqual(negFires.samples, 2, 'shipped-history.md is part of the control');
+    assert.strictEqual(negFires.pass, false, 'and one fire on the person\'s own writing fails it');
+    assert.ok(negFires.fires.some(f => f.fired.includes('banned') && f.fired.includes('antithesis')),
+      'naming every rule that fired, because each one is a candidate to strike');
+
+    // The hooks.md check. It is blocked rather than passing while the file is
+    // absent, because passing an empty scan is how a CI check goes quiet.
+    const hooksAbsent = gateHooks(path.join(root, 'hooks.md'));
+    assert.strictEqual(hooksAbsent.pass, false, 'an absent hooks.md is blocked, not passed');
+    assert.strictEqual(hooksAbsent.hooks_file, 'absent', 'and says which');
+
+    // Section 13.2 names both of these: the gate bans them and they are both
+    // natural hook shapes, so the library is where they leak in.
+    const hooksBad = writeFixture(tellDir, 'hooks.md',
+      '# Hooks\n\n## The correction\n\n> It' + APOS + 's not a process problem, it' + APOS +
+      's a memory problem.\n\n## The drum roll\n\n> The result?\n');
+    const hb = gateHooks(hooksBad);
+    assert.strictEqual(hb.example_lines, 2, 'a blockquote line is an example line');
+    assert.strictEqual(hb.violations.length, 2, 'and both of section 13.2\'s named patterns are caught');
+    assert.strictEqual(hb.pass, false, 'so a library shipping them fails');
+
+    const hooksOk = writeFixture(tellDir, 'hooks-ok.md',
+      '# Hooks\n\n## The correction\n\n> The documentation was fine. The context was gone.\n');
+    assert.strictEqual(gateHooks(hooksOk).pass, true, 'and a clean example line passes');
+    assert.strictEqual(gateHooks(hooksOk).violations.length, 0, 'with nothing to report');
+
+    // ------------------------------------- the false-positive half of step 4
+    //
+    // Section 12.1 metric 4 is the false-positive rate, and section 9 says a
+    // rule that is wrong costs a rewrite of good writing on every future draft
+    // forever. Every narrowing below is a promise, so every narrowing gets an
+    // assert that fails if it is widened back.
+    assert.ok(!firedIn('at least, we believe the number was wrong.\n')
+      .includes('at-company-we-believe'),
+      'the capital after "at" is what separates a company from a preposition');
+    assert.ok(!firedIn('We shipped it.\n\nWhat we learned:\n\nNobody read it.\n')
+      .includes('rhetorical-fragment'),
+      'section 9 says one word or two, and three is a real subheading');
+    assert.ok(!firedIn('The chart went up 40% last quarter \u{1F680} and nobody noticed.\n')
+      .includes('emoji-bullets'), 'an emoji inside a sentence is not a bullet');
+    assert.ok(!firedIn('one here\ntwo here\n\nthree here\nfour here\n')
+      .includes('uniform-paragraphs'), 'two matching paragraphs is a coincidence');
+    assert.ok(!firedIn('one here\ntwo here\n\nonly one\n\nthree here\nfour here\nfive here\n')
+      .includes('uniform-paragraphs'),
+      'and every paragraph has to match, not merely one of them');
+    assert.ok(!firedIn('the deck was late and nobody read it before the meeting started.\n')
+      .includes('we-with-no-human'),
+      'a post naming nobody and claiming nothing collectively is not the announcement tell');
+    assert.ok(firedIn('The result? Nobody at Acme noticed for a week.\n')
+      .includes('rhetorical-fragment'),
+      'the named phrase fires inline too, where the standalone-line shape cannot see it');
+
+    // --------------------------------------------- the gate's own error paths
+    //
+    // The shipping corpus is clean by construction, so it cannot exercise a
+    // miss, an unknown id, an unlisted file, or a row pointing at nothing. A
+    // recall number that cannot report a miss is not a recall number.
+    const synth = path.join(root, 'synth');
+    writeFixture(synth, '01.md', 'Acme shipped in March 2026 and nobody wrote it down.\n');
+    writeFixture(synth, '02.md', 'Contoso did the same in April, and Dana noticed it first.\n');
+    writeFixture(synth, '04.md', 'Listed nowhere.\n');
+    writeFixture(synth, 'expected.md',
+      '01: em-dash                              # 01.md has none, so this is a miss\n' +
+      '02: announcement-shape, not-a-real-tell  # judged, plus an id that exists nowhere\n' +
+      '03: em-dash                              # no 03.md on disk\n');
+    const sy = gateFixtures(synth);
+    assert.strictEqual(sy.deterministic_expected, 1, 'only the engine-owned row is scored');
+    assert.strictEqual(sy.deterministic_caught, 0, 'and a tell the post lacks is a miss');
+    assert.strictEqual(sy.judged_expected, 1, 'the judged row is counted apart from it');
+    assert.deepStrictEqual(sy.per_fixture.find(r => r.fixture === '01.md').missed, ['em-dash'],
+      'the miss is named, not just totalled');
+    assert.deepStrictEqual(sy.per_fixture.find(r => r.fixture === '02.md').expected_engine, [],
+      'a judged tell is never scored as engine work, or the recall number is a lie');
+    assert.ok(sy.errors.some(e => e.startsWith('04.md') && /no row/.test(e)),
+      'a fixture with no row is an error');
+    assert.ok(sy.errors.some(e => e.startsWith('03.md') && /absent/.test(e)),
+      'and so is a row with no fixture');
+    assert.ok(sy.errors.some(e => /not-a-real-tell/.test(e)),
+      'and an id in neither ai-tells.md nor the table');
+    assert.strictEqual(sy.pass, false, 'so none of that passes');
+
+    // Section 13.2 asks for 20. A corpus that catches everything it claims and
+    // holds one post is still not the corpus the step needs.
+    const oneOnly = path.join(root, 'onefixture');
+    writeFixture(oneOnly, '01.md',
+      'It' + APOS + 's not a tooling gap, it' + APOS + 's a trust gap. Dana said so in March.\n');
+    writeFixture(oneOnly, 'expected.md', '01: antithesis\n');
+    const oo = gateFixtures(oneOnly);
+    assert.deepStrictEqual(oo.errors, [], 'the rows are clean');
+    assert.strictEqual(oo.deterministic_caught, oo.deterministic_expected, 'and the tell fires');
+    assert.strictEqual(oo.pass, false, 'and one post is still not twenty');
+
+    // ------------------------------------------------- drift, in both directions
+    //
+    // ai-tells.md is where a tell is read and engine.js is where it fires. One
+    // holding an entry the other does not is the failure that makes the
+    // document describe a gate other than the one running.
+    const driftExtra = writeFixture(root, 'drift-extra.md',
+      TELLS.map(x => '### ' + x.id).join('\n\n') + '\n\n### invented-tell\n');
+    const de = gateTells(driftExtra);
+    assert.deepStrictEqual(de.missing_from_ai_tells_md, [], 'every implemented tell is documented');
+    assert.deepStrictEqual(de.missing_from_engine_js, ['invented-tell'],
+      'and a documented tell nothing implements is named');
+    assert.strictEqual(de.pass, false, 'which is drift');
+
+    const driftShort = writeFixture(root, 'drift-short.md',
+      TELLS.slice(1).map(x => '### ' + x.id).join('\n\n') + '\n');
+    const ds = gateTells(driftShort);
+    assert.deepStrictEqual(ds.missing_from_ai_tells_md, [TELLS[0].id],
+      'and an implemented tell nobody documented');
+    assert.strictEqual(ds.pass, false, 'which is drift the other way');
+
+    const hooksEmpty = writeFixture(tellDir, 'hooks-empty.md', '# Hooks\n\nNothing yet.\n');
+    const he = gateHooks(hooksEmpty);
+    assert.strictEqual(he.example_lines, 0, 'no blockquote is no example line');
+    assert.strictEqual(he.pass, false,
+      'and a check that scanned nothing reports blocked, not clean');
+
+    // ------------------------------------ what the negative control has to see
+    const neg2 = path.join(root, 'profiles', 'negative2');
+    writeFixture(neg2, 'voice.md',
+      'avg_sentence_length: 14\nsentence_length_stdev: 9\ncontraction_rate: 6\n' +
+      'uses_fragments: yes\n\n## Samples\n\n' +
+      // voice.md's Habits section marks its entries source: derived. Reading one
+      // as a pasted sample measures the engine's summary of the person instead
+      // of the person, which is the one thing this control cannot afford.
+      '- source: derived\n  text: |\n    opens mid story; leans on fragments.\n\n' +
+      '- source: pasted\n  kind: linkedin post\n  text: |\n' +
+      '    the deck was late; nobody read it.\n    Dana found the error.\n');
+    const n2 = gateNegative(neg2);
+    assert.strictEqual(n2.samples, 1, 'a derived habit is not a pasted sample');
+    assert.strictEqual(n2.posts, 1, 'and kind: is read, or nothing is ever a post');
+    assert.ok(n2.fires.some(f => f.fired.includes('semicolon')),
+      'section 9 bans semicolons in short posts, so a post-kind sample is scanned for them');
+
+    // A rewrite-action flag from stats has to fail the control too. Only the
+    // redraft and flag actions are exempt, and reading all of stats as exempt
+    // retires three of section 9's texture rules from the control silently.
+    const neg3 = path.join(root, 'profiles', 'negative3');
+    writeFixture(neg3, 'shipped-history.md',
+      '- posted_at: 2025-09-01\n  text: |\n' +
+      '    the review slipped again\n    nobody owned the date\n\n' +
+      '    the deck was ready\n    the decision was not\n\n' +
+      '    that was the whole quarter\n    and it repeated in the next one\n');
+    const n3 = gateNegative(neg3);
+    assert.ok(n3.fires.some(f => f.fired.includes('uniform-paragraphs')),
+      'a rewrite-action flag fails the control');
+    assert.ok(n3.also_flagged.some(f => f.action === 'flag' || f.action === 'redraft'),
+      'and a flag or redraft is reported without failing it');
+    assert.ok(!n3.fires.some(f => f.fired.includes('specifics-floor')),
+      'because section 13.2 counts rewrites, and a redraft edits nothing');
+
+    return {
+      check: 'test',
+      pass: true,
+      subcommands: ['overlap', 'lexical', 'stats', 'locks', 'gate'],
+    };
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -1122,10 +1862,17 @@ function main(argv) {
       return stats(need(args[0], 'draft'), args[1] ? need(args[1], 'profile directory') : null);
     case 'locks':
       return locks(need(args[0], 'profile directory'));
+    case 'gate': {
+      const here = f => path.join(__dirname, f);
+      if (rest.includes('--tells')) return gateTells(args[0] || here('ai-tells.md'));
+      if (rest.includes('--hooks')) return gateHooks(args[0] || here('hooks.md'));
+      if (rest.includes('--negative')) return gateNegative(need(args[0], 'profile directory'));
+      return gateFixtures(need(args[0] || here('gate-fixtures'), 'fixtures directory'));
+    }
     case 'test':
       return selfTest();
     default:
-      die('usage: engine.js overlap|lexical|stats|locks|test (see the header)');
+      die('usage: engine.js overlap|lexical|stats|locks|gate|test (see the header)');
   }
 }
 
@@ -1133,4 +1880,7 @@ if (require.main === module) {
   process.stdout.write(JSON.stringify(main(process.argv.slice(2)), null, 2) + '\n');
 }
 
-module.exports = { overlap, lexical, stats, locks, measure, selfTest };
+module.exports = {
+  overlap, lexical, stats, locks, measure, selfTest,
+  gateFixtures, gateNegative, gateHooks, gateTells, TELLS,
+};
