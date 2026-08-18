@@ -237,9 +237,16 @@ Inside a profile, two zones:
   After that: `inventory` appends to `inventory.md`; `review` appends to
   `learnings.md` and to `inventory.md` for each cleared harvest candidate;
   `connect` writes `connectors.md`; `retract` appends a `withdrawn:` line; and
-  the first visual run writes `theme.json` once. Nothing else, ever. **A draft
-  run reads profile files and never modifies one**, so no post can quietly
-  change who the engine thinks you are.
+  the first visual run writes `theme.json` once. Nothing else, ever.
+
+  **The paste path is the one write a draft run may make**, and it is
+  `inventory`'s writer rather than a new one. `post "<pasted material>"` appends
+  what the human pasted, verbatim, `source: pasted`, `clearance:` set in the
+  same turn, the run slug recorded, and only after they accept the draft. Never
+  anything the model derived, inferred, or rewrote. A run drafting from standing
+  inventory writes nothing. **A draft run otherwise reads profile files and
+  never modifies one**, so no post can quietly change who the engine thinks you
+  are: the only line a post can add is one the human typed into it.
 - **The ledger** is `runs/` and `analytics/`. Every run appends to it.
 
 `inventory.md` and `learnings.md` are append-only. Correcting an entry means
