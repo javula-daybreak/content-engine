@@ -267,16 +267,28 @@ function shippedHistory(text) {
 }
 
 // voice.md's four frozen measurements. Section 6, frozen at setup.
+//
+// First *parseable* value wins, not first match. The template ships these keys
+// with empty values inside a labelled fence, so a first-match read returns null
+// for any profile whose numbers were appended below that fence rather than
+// typed into it. Section 9's voice floor then never fires and the JSON reports
+// "no samples", which is a false statement about a check the gate counts on.
 function voiceMeasures(text) {
+  const pick = (key, ok) => {
+    const re = new RegExp('^[ \\t]*' + key + ':[ \\t]*(.*)$', 'gm');
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const v = m[1].trim();
+      if (ok(v)) return v;
+    }
+    return null;
+  };
   const out = {};
   for (const key of ['avg_sentence_length', 'sentence_length_stdev', 'contraction_rate']) {
-    const m = text.match(new RegExp('^\\s*' + key + ':\\s*(.*)$', 'm'));
-    const v = m ? m[1].trim() : '';
-    out[key] = v && !isNaN(parseFloat(v)) ? parseFloat(v) : null;
+    const v = pick(key, s => s !== '' && !isNaN(parseFloat(s)));
+    out[key] = v === null ? null : parseFloat(v);
   }
-  const f = text.match(/^\s*uses_fragments:\s*(.*)$/m);
-  const fv = f ? f[1].trim() : '';
-  out.uses_fragments = /^(yes|no)$/.test(fv) ? fv : null;
+  out.uses_fragments = pick('uses_fragments', s => /^(yes|no)$/.test(s));
   return out;
 }
 
@@ -514,8 +526,18 @@ function lexical(draftPath, opts) {
   // Section 9: a draft containing any literal string in brief.md's
   // private_terms is rejected and redrafted, not rewritten. brief.md sits
   // beside draft.md in the run directory.
-  const brief = frontMatter(readIfPresent(path.join(path.dirname(draftPath), 'brief.md')));
-  const privateTerms = Array.isArray(brief.private_terms) ? brief.private_terms : [];
+  const briefPath = path.join(path.dirname(draftPath), 'brief.md');
+  const briefFound = fs.existsSync(briefPath);
+  const brief = frontMatter(readIfPresent(briefPath));
+  // A bare `private_terms: Northwind, 41%` is the drift a model actually
+  // writes, and reading it as absent leaves this guarding nothing on exactly
+  // the material section 9 says a tired human approves at 8am.
+  const rawTerms = brief.private_terms;
+  const privateTerms = Array.isArray(rawTerms)
+    ? rawTerms
+    : (rawTerms
+        ? String(rawTerms).replace(/^\[|\]$/g, '').split(',').map(s => s.trim()).filter(Boolean)
+        : []);
   const privateHits = [];
   const lower = draft.toLowerCase();
   for (const term of privateTerms) {
@@ -541,6 +563,8 @@ function lexical(draftPath, opts) {
     not_rewritten_quoted_or_factual: protectedHits,
     hashtags: { count: hashtags.length, stack: hashtags.length >= HASHTAG_STACK },
     private_terms: {
+      // "checked: 0" reads as "nothing to guard". Say which one it was.
+      brief: briefFound ? 'found' : 'missing',
       checked: privateTerms.length,
       violations: privateHits,
       note: 'a private_terms hit is a redraft, not a rewrite. Section 9.',
@@ -565,9 +589,14 @@ function contractionCount(tokens) {
 // capitalized common noun and misses a lowercase brand. It is a floor check
 // ("this draft names nothing at all"), not a census, and section 9 only ever
 // asks whether the count is zero.
+//
+// Counted over the split sentences rather than the raw text, so a numbered
+// list does not clear the floor on its own numbering. That draft is the exact
+// abstraction section 9 says cannot be patched into an instance.
 function countSpecifics(text) {
-  let n = (text.match(/\$\d[\d,.]*|\b\d[\d,.]*%?\b/g) || []).length;
-  for (const s of sentences(text)) {
+  const ss = sentences(text);
+  let n = (ss.join(' ').match(/\$\d[\d,.]*|\b\d[\d,.]*%?\b/g) || []).length;
+  for (const s of ss) {
     const w = s.split(/\s+/).filter(Boolean);
     for (let i = 1; i < w.length; i++) {
       const t = w[i].replace(/^[^A-Za-z]+/, '').replace(/[^A-Za-z]+$/, '');
@@ -700,7 +729,11 @@ function locks(profile) {
     archetype_locked: Array.from(archetypeLocked),
     thesis_hook_pairs_locked_30d: pairs,
     last_shipped: briefs.length ? recent(briefs).slug : null,
-    run_start_line: unlocked.length + ' unlocked anchors, ' + runway + ' posts of runway.',
+    // Sections 3, 12 and SKILL.md all print this line with the trailing
+    // "at current cadence"; section 7b's worked example is the one place that
+    // drops it. Matching the three.
+    run_start_line: unlocked.length + ' unlocked anchors, ' + runway +
+      ' posts of runway at current cadence.',
   };
 }
 
@@ -740,8 +773,13 @@ function selfTest() {
     assert.strictEqual(untraceable.failures[0].words, 13, 'span is the full 13 words');
     assert.strictEqual(untraceable.failures[0].prior, '2026-01-05-prior', 'span names the prior slug');
 
+    // Wrapped across two lines, because that is how a three-sentence content
+    // field is actually written. A parser that keeps only the first line
+    // exempts half the story and fails the person on the other half.
     writeFixture(profile, 'inventory.md',
-      '## Items\n\n- id: shadow-spreadsheet\n  content: ' + RUN + '.\n  clearance: public\n');
+      '## Items\n\n- id: shadow-spreadsheet\n' +
+      '  content: the shadow spreadsheet is where the real\n' +
+      '    planning happens every single week here.\n  clearance: public\n');
     const traceable = overlap(draft, profile);
     assert.strictEqual(traceable.pass, true, 'the same run sourced from inventory must pass');
     assert.strictEqual(traceable.failures.length, 0, 'nothing left to fail');
@@ -766,9 +804,68 @@ function selfTest() {
       'A different observation about pallet turns at Acme in March 2026.\nNobody measures it.\n');
     assert.strictEqual(overlap(clean, profile).pass, true, 'unrelated draft passes');
 
+    // A brief that never shipped, and a directory under runs/ that is not a
+    // run. Admitting the first invents overlap against text nobody published;
+    // admitting the second reads a file that need not exist.
+    writeFixture(profile, 'runs/2026-01-06-unshipped/brief.md', 'anchor: x\nstatus: drafted\n');
+    writeFixture(profile, 'runs/scratch/shipped.md', RUN + '.\n');
+    assert.strictEqual(overlap(clean, profile).priors_compared, 1,
+      'only dated run directories holding a shipped.md are priors');
+
+    // Section 3 says 8+ words, so 7 shared words must pass. This pins the
+    // threshold from below; the 13-word run above pins it from above. Without
+    // both, NGRAM is a number no test can see.
+    const seven = writeFixture(draftDir, 'seven.md',
+      'I keep finding where the real planning happens every time I look at a rollout.\n' +
+      'Acme, March 2026, and nobody wrote it down.\n');
+    const sevenR = overlap(seven, profile);
+    assert.strictEqual(sevenR.pass, true, 'a 7-word shared run is not a violation');
+    assert.strictEqual(sevenR.failures.length + sevenR.warnings.length, 0, 'and forms no span');
+
+    // Section 3's other half: more than ~15% sentence similarity to one prior.
+    // These sentences share no 8-gram at all, so this can only pass if the
+    // paraphrase check is doing its own work.
+    const para = writeFixture(draftDir, 'paraphrase.md',
+      'In the QBR nobody admits it.\nAcme said so in March 2026.\n');
+    const paraR = overlap(para, profile);
+    assert.strictEqual(paraR.failures.length, 0, 'a reordered short sentence forms no 8-gram');
+    assert.strictEqual(paraR.sentence_similarity.length, 1, 'but it is the same sentence');
+    assert.strictEqual(paraR.pass, false, 'and section 3 calls that a hard fail');
+
+    // Section 13.1 caps the corpus at the last 20 shipped runs, and "last"
+    // is the half that matters: a cap that kept the oldest 20 would stop
+    // seeing anything the person wrote this quarter. The 23rd run repeats the
+    // 22nd verbatim, so the span is also proof that the oldest use is the one
+    // named, which is the citation a warning is supposed to point at.
+    const capProfile = path.join(root, 'profiles', 'cap');
+    const capLine = n => 'prior number ' + n + ' said absolutely nothing at all that week.\n';
+    for (let i = 1; i <= 22; i++) {
+      writeFixture(capProfile, 'runs/2026-02-' + String(i).padStart(2, '0') + '-p' + i + '/shipped.md', capLine(i));
+    }
+    writeFixture(capProfile, 'runs/2026-02-23-dup/shipped.md', capLine(22));
+    const capDraft = writeFixture(draftDir, 'cap.md', capLine(22));
+    const cap = overlap(capDraft, capProfile);
+    assert.strictEqual(cap.priors_compared, 20, 'the corpus is capped at 20 runs');
+    assert.ok(cap.failures.some(f => f.prior === '2026-02-22-p22'),
+      'the cap keeps the newest 20, and the oldest use of a span is the one named');
+
+    // shipped-history.md is the whole diff corpus until 20 engine posts exist,
+    // which is every week that matters most. Its own profile, no runs/ at all.
+    const histProfile = path.join(root, 'profiles', 'history');
+    const HIST = 'we lost the renewal because nobody read the implementation notes until the quarter closed';
+    writeFixture(histProfile, 'shipped-history.md',
+      '```\n- posted_at:\n  text: |\n    <verbatim>\n  source: pasted\n```\n\n' +
+      '- posted_at: 2025-11-02\n  text: |\n    ' + HIST + '.\n  source: pasted\n');
+    const histDraft = writeFixture(draftDir, 'hist.md', HIST + '.\nAcme, March 2026.\n');
+    const hist = overlap(histDraft, histProfile);
+    assert.strictEqual(hist.priors_compared, 1, 'the schema fence is not a prior, the entry is');
+    assert.strictEqual(hist.pass, false, 'a pre-engine post is still the diff corpus');
+    assert.strictEqual(hist.failures[0].prior, 'shipped-history:2025-11-02', 'named by its posted_at');
+
     // ---- lexical ----
     const lexDir = path.join(root, 'lex');
-    writeFixture(lexDir, 'brief.md', 'anchor: a\nprivate_terms: [Northwind, 41%]\nstatus: drafted\n');
+    writeFixture(lexDir, 'brief.md',
+      'anchor: a\nprivate_terms: ["Northwind", "41%"]\nstatus: drafted\n');
     const lexDraft = writeFixture(lexDir, 'draft.md',
       'We are going to leverage this' + EM_DASH + ' and it is robust.\n' +
       'She said "we should double down on that" in the review.\n' +
@@ -779,6 +876,7 @@ function selfTest() {
     assert.strictEqual(lex.pass, false, 'a draft this loud cannot pass');
     assert.strictEqual(lex.action, 'reject', 'a private_terms hit rejects rather than rewrites');
     assert.strictEqual(lex.private_terms.violations.length, 1, '41% is a private term in the draft');
+    assert.strictEqual(lex.private_terms.violations[0].term, '41%', 'quoted list items lose their quotes');
     const tags = lex.hits.map(h => h.tag);
     assert.ok(tags.includes('em-dash'), 'em dash caught');
     assert.ok(tags.includes('banned'), 'banned list caught');
@@ -791,9 +889,49 @@ function selfTest() {
     assert.ok(quoted.some(t => t.startsWith('double down')), 'quoted ban is protected');
     assert.ok(!lex.hits.some(h => h.match.toLowerCase().startsWith('double down')),
       'a protected hit is never counted as a rewrite');
+    // Section 9's carve-outs are the false-positive half, and section 12.1
+    // metric 4 says a fire on the person's own writing is a defect, not a
+    // tuning signal. An en dash between digits is legal, a curly-quoted ban is
+    // reported rather than rewritten, and a stem on the list catches suffixes.
+    const carveDir = path.join(root, 'carve');
+    writeFixture(carveDir, 'brief.md',
+      'anchor: a\narchetype: bar     # visual runs only\n' +
+      'private_terms: [Northwind,\n  Contoso]\nstatus: drafted\n');
+    const carveDraft = writeFixture(carveDir, 'draft.md',
+      'Revenue ran 2024' + EN_DASH + '2025 and margin held near 10' + EN_DASH + '15 percent.\n' +
+      'He said ' + CURLY_OPEN + 'we kept unpacking it' + CURLY_CLOSE + ' in the Northwind review.\n' +
+      'Then we spent a week unpacking the same deck.\n');
+    const cv = lexical(carveDraft, { short: true });
+    assert.ok(!cv.hits.some(h => h.tag === 'en-dash'), 'an en dash between digits is legal');
+    assert.strictEqual(cv.hits.filter(h => h.tag === 'banned').length, 1,
+      'the stem catches "unpacking", and only the unquoted one is rewritable');
+    assert.ok(cv.not_rewritten_quoted_or_factual.some(h => h.tag === 'banned'),
+      'a curly-quoted ban is protected, and curly is what every real keyboard emits');
+    assert.strictEqual(cv.private_terms.checked, 2, 'a wrapped bracket list is still two terms');
+    assert.strictEqual(cv.private_terms.violations.length, 1, 'and it still guards');
+    assert.strictEqual(cv.private_terms.violations[0].term, 'Northwind',
+      'and the bracket is not part of the term');
+    // An en dash between words is still a tell.
+    const enWords = writeFixture(carveDir, 'enwords.md',
+      'The plan' + EN_DASH + 'if you can call it that' + EN_DASH + 'was late.\n');
+    assert.ok(lexical(enWords, { short: true }).hits.some(h => h.tag === 'en-dash'),
+      'an en dash between words is not exempt');
+
     // The semicolon rule is short-post only.
     assert.ok(!lexical(lexDraft, { short: false }).hits.some(h => h.tag === 'semicolon'),
       'semicolons are legal outside short posts');
+    // An unbracketed private_terms list is the drift that would otherwise turn
+    // section 9's one non-negotiable string match into a no-op.
+    const bareBriefDir = path.join(root, 'lexbare');
+    writeFixture(bareBriefDir, 'brief.md', 'anchor: a\nprivate_terms: Northwind, 41%\nstatus: drafted\n');
+    const bareDraft = writeFixture(bareBriefDir, 'draft.md', 'It cost us 41% of the quarter.\n');
+    const bareLex = lexical(bareDraft, { short: false });
+    assert.strictEqual(bareLex.private_terms.checked, 2, 'both unbracketed terms parsed');
+    assert.strictEqual(bareLex.action, 'reject', 'an unbracketed list still rejects');
+    // A missing brief.md is not the same answer as a brief that declared none.
+    const noBrief = writeFixture(path.join(root, 'nobrief'), 'draft.md', 'Acme shipped in March.\n');
+    assert.strictEqual(lexical(noBrief, { short: false }).private_terms.brief, 'missing',
+      'an absent brief.md is reported, not read as zero private terms');
 
     // ---- stats ----
     const statDir = path.join(root, 'stat');
@@ -819,8 +957,33 @@ function selfTest() {
     const poss = writeFixture(statDir, 'possessive.md', "Acme's board met.\nThe team's answer was no.\n");
     assert.strictEqual(stats(poss, null).measured.contraction_rate, 0,
       'a possessive is never counted as a contraction');
+    // LinkedIn posts are mostly unpunctuated fragments on their own lines. A
+    // splitter that only knows terminal punctuation reads this as one sentence
+    // and every distribution rule in section 9 is then measured on n = 1.
+    const frag = writeFixture(statDir, 'fragments.md',
+      'Three years in supply chain\nNobody told me this\nIt still surprises me\n');
+    assert.strictEqual(stats(frag, null).measured.sentences, 3, 'a line break ends a sentence');
+    const oneLine = writeFixture(statDir, 'oneline.md', 'It never worked. Nobody said so at all.\n');
+    assert.strictEqual(stats(oneLine, null).measured.sentences, 2,
+      'and a full stop still ends one inside a line');
     assert.ok(st.measured.specifics > 0, 'Acme and March are specifics');
     assert.ok(st.measured.sentence_length_stdev > 0, 'varied lengths give nonzero stdev');
+    // Slack, Gmail and macOS all autocorrect to a curly apostrophe, so a
+    // straight-quote-only contraction test measures nothing that ever arrives.
+    const curly = writeFixture(statDir, 'curly.md',
+      'It' + APOS + 's late.\nWe didn' + APOS + 't ship.\n');
+    const cu = stats(curly, null).measured;
+    assert.strictEqual(cu.words, 5, 'five words');
+    assert.strictEqual(cu.contraction_rate, round(2 / 5 * 100, 2), 'a curly apostrophe still contracts');
+    // Section 9 counts numerals as specifics. A list numbering itself is not
+    // one of them, or every abstraction clears the floor by wearing bullets.
+    const numeric = writeFixture(statDir, 'numeric.md', 'we cut it 41 percent in one quarter\n');
+    assert.ok(!stats(numeric, null).flags.some(f => f.rule === 'specifics-floor'),
+      'a numeral alone clears the specifics floor');
+    const listed = writeFixture(statDir, 'listed.md',
+      '1. everything is about alignment\n2. it always has been\n3. it always will be\n');
+    assert.ok(stats(listed, null).flags.some(f => f.rule === 'specifics-floor'),
+      'a list numbering itself names nothing');
     // Section 9's specifics floor fires on an abstraction.
     const empty = writeFixture(statDir, 'empty.md', 'Everything is about alignment.\nIt always has been.\n');
     assert.ok(stats(empty, null).flags.some(f => f.rule === 'specifics-floor'),
@@ -830,6 +993,19 @@ function selfTest() {
       'avg_sentence_length: 12\nsentence_length_stdev: 20\ncontraction_rate: 8\nuses_fragments: yes\n');
     assert.ok(stats(statDraft, profile).flags.some(f => f.rule === 'voice-floor' && f.metric === 'contraction_rate'),
       'zero contractions against a baseline of 8 trips the voice floor');
+    // The template ships those keys empty inside a fence. A profile whose real
+    // numbers were appended below it still has a baseline, and reporting "no
+    // samples" there would silently retire the voice floor.
+    const appended = path.join(root, 'profiles', 'voice-appended');
+    writeFixture(appended, 'voice.md',
+      '```\navg_sentence_length:\nsentence_length_stdev:\ncontraction_rate:\n' +
+      'uses_fragments: yes | no\n```\n\n' +
+      'avg_sentence_length: 12\nsentence_length_stdev: 20\ncontraction_rate: 8\nuses_fragments: yes\n');
+    const app = stats(statDraft, appended);
+    assert.strictEqual(app.baseline.contraction_rate, 8, 'an empty placeholder is not a value');
+    assert.strictEqual(app.baseline.uses_fragments, 'yes', 'and neither is "yes | no"');
+    assert.strictEqual(app.baseline_source, 'voice.md', 'the baseline is found, not fallen back from');
+    assert.ok(app.flags.some(f => f.rule === 'voice-floor'), 'the floor fires off it');
 
     // ---- locks ----
     const lockProfile = path.join(root, 'profiles', 'locks');
@@ -839,18 +1015,26 @@ function selfTest() {
       '## Items\n\n' +
       ['a', 'b', 'c', 'd'].map(id => '- id: ' + id + '\n  content: item ' + id + '\n  clearance: public\n').join('\n') +
       '\n- id: e\n  content: retired item\n  clearance: do-not-publish\n' +
-      '\n- id: f\n  content: withdrawn item\n  clearance: public\n  withdrawn: 2026-02-01 retracted\n');
+      '\n- id: f\n  content: withdrawn item\n  clearance: public\n  withdrawn: 2026-02-01 retracted\n' +
+      '\n- id: g\n  content: corrected item d\n  clearance: public\n  supersedes: d\n');
     const mk = (date, slug, fm) => writeFixture(lockProfile, 'runs/' + date + '-' + slug + '/brief.md', fm);
     mk('2026-01-01', 'one', 'anchor: a\nhook_id: confession\nthesis_id: t1\nstatus: shipped\n');
     mk('2026-01-02', 'two', 'anchor: b\nhook_id: confession\nthesis_id: t2\nstatus: shipped\n');
-    mk('2026-01-03', 'three', 'anchor: c\nhook_id: number\nthesis_id: t1\narchetype: bar\nstatus: shipped\n');
+    // The template schemas carry trailing comments and a model copying that
+    // shape writes them into brief.md too.
+    mk('2026-01-03', 'three',
+      'anchor: c\nhook_id: number\nthesis_id: t1\narchetype: bar   # visual runs only\nstatus: shipped\n');
     mk('2026-01-04', 'four', 'anchor: d\nhook_id: number\nthesis_id: t1\nstatus: drafted\n');
     const lk = locks(lockProfile);
     assert.strictEqual(lk.shipped_pieces, 3, 'the drafted brief is not shipped');
-    assert.strictEqual(lk.inventory_pool, 4, 'do-not-publish and withdrawn are out of the pool');
+    assert.strictEqual(lk.inventory_pool, 4,
+      'do-not-publish, withdrawn and superseded are all out of the pool');
     assert.ok(!lk.unlocked_anchors.includes('<short-kebab-slug>'),
       "the fenced schema example is documentation, not an item");
-    assert.deepStrictEqual(lk.unlocked_anchors, ['d'], 'a, b and c are locked by the trailing 10');
+    // Section 7 corrects by appending a supersedes row, never by rewriting, so
+    // the superseded id has to leave the pool or a correction ships twice.
+    assert.deepStrictEqual(lk.unlocked_anchors, ['g'],
+      'a, b and c are anchor-locked, and d was superseded by g');
     assert.strictEqual(lk.runway_posts, 0, 'a pool of 4 has no runway above the 10-post lock');
     assert.strictEqual(lk.rotation_healthy, false, 'one unlocked anchor cannot turn the rotation');
     assert.ok(lk.hook_locked_recent.includes('confession'), 'confession is inside the trailing 8');
@@ -859,6 +1043,23 @@ function selfTest() {
     assert.ok(!lk.hook_at_window_limit.includes('number'), 'once in 20 is not');
     assert.deepStrictEqual(lk.archetype_locked, ['bar'], 'the one shipped visual piece locks its archetype');
     assert.strictEqual(lk.last_shipped, '2026-01-03-three', 'ordering is by directory date');
+    assert.deepStrictEqual(lk.thesis_hook_pairs_locked_30d, [],
+      'every fixture brief above is older than 30 days, so no pair is locked');
+
+    // The pair lock is the only lock with a clock, so its fixture dates are
+    // relative. Fixed dates pass on the day they are written and then quietly
+    // stop reaching the window, which is how a lock ends up with no coverage.
+    const pairProfile = path.join(root, 'profiles', 'pairs');
+    const daysAgo = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    writeFixture(pairProfile, 'runs/' + daysAgo(60) + '-old/brief.md',
+      'anchor: b\nhook_id: number\nthesis_id: t2\nstatus: shipped\n');
+    writeFixture(pairProfile, 'runs/' + daysAgo(3) + '-recent/brief.md',
+      'anchor: a\nhook_id: confession\nthesis_id: t1\nstatus: shipped\n');
+    const pl = locks(pairProfile);
+    assert.strictEqual(pl.shipped_pieces, 2, 'both pair briefs are shipped');
+    assert.deepStrictEqual(pl.thesis_hook_pairs_locked_30d.map(x => x.pair), ['t1 x confession'],
+      'a pair 3 days old is locked and one 60 days old is not');
+
     // An empty profile must not throw.
     const bare = path.join(root, 'profiles', 'bare');
     fs.mkdirSync(bare, { recursive: true });
