@@ -779,7 +779,7 @@ Note on the math: 1M in 6 months is roughly 40k impressions a week sustained, an
 
 **Pro-plan viability.** The criterion is behavioural and binary: four short posts complete in one week on a Pro plan with no limit interruption, measured in week 2. The engine does not estimate its own usage. Measure it with `/cost` at end of day for the first ten working days in a scratch file, then delete the exercise.
 
-**Portability test:** hand the repo to someone outside Daybreak. If they get a post they'd actually publish out of session 1, with no help from Joseph, it passes. **The tester runs the short-post path only; carousel portability is tested separately once `render/` exists.** Record the wall clock and where she stops, not only whether she finishes, and replace the target here with the measured median across Joseph, Fallon, Tim, and the IBM mentor, stated as two numbers: time to a first publishable post, and time to a full profile. Corollary check: after her run, `git status` shows changes inside `profiles/<handle>/` and nowhere else.
+**Portability test:** hand the repo to someone outside Daybreak. If they get a post they'd actually publish out of session 1, with no help from Joseph, it passes. **The tester runs the short-post path only; carousel portability is tested separately once `render/` exists.** Record the wall clock and where she stops, not only whether she finishes, and replace the target here with the measured median across Joseph, Fallon, Tim, and the IBM mentor, stated as two numbers: time to a first publishable post, and time to a full profile. Corollary check: after her run, `git status` shows **nothing**. `profiles/*` is gitignored per §1.2, so the profile's own writes are invisible to it by construction and the check is one-sided: it cannot confirm the run wrote inside the profile, and any output at all is a §1.3 violation. That is the half worth testing.
 
 ### 12.1 The five numbers to instrument first
 
@@ -898,7 +898,7 @@ Hold these as the definition of done. They need no further PRD edit; they are th
 **Step 9b, the harvest** (only if §12.1 metric 3 came in under 1.5 a week at week 6)
 - The sender and subtype filter runs before any model call, and the discard count is printed. If the model is reading the discard pile, the filter is not built.
 - Every candidate is written `clearance: do-not-publish` before the human sees it. There is no code path that produces a cleared item without a keystroke.
-- Skipped candidates leave no file behind. Check with `git status` after a sweep that clears nothing.
+- Skipped candidates leave no file behind. **Not checkable with `git status`**, in any invocation: `.gitignore` excludes the profile directory itself, so git never descends into it and every variant collapses to one `!! profiles/<handle>/` line. Diff a file listing instead: `find profiles/<handle> -type f | sort` before the sweep and after, and a sweep that clears nothing produces an identical listing. Verified 2026-08-18 while building step 2.
 - Unplug the MCP server mid-build and run `/content-engine review`. It reports the missing server in one line and completes. That is §14's no-connector rule, tested rather than asserted.
 - Measure the clear rate over the first 30 candidates against the kill criterion in §7c before writing anything else on top of it.
 
