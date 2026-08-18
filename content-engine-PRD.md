@@ -467,7 +467,7 @@ Dedup reuses the lock mechanism: a signal whose id appears in any brief.md is ne
 The scan runs at the top of the default run, and only when signals.md is older than 24 hours. Capped at three queries. Run start gains one block above the §3 runway line:
 
 ```
-3 unlocked anchors, 14 posts of runway.
+14 unlocked anchors, 9 posts of runway at current cadence.
 Signals since Aug 15:
   1. contradiction  a16z partner, Aug 16: "agents are a UI problem"   (cuts thesis-2)
   2. proof          Anthropic, Aug 15: "evals now gate deploys"       (backs thesis-1)
@@ -774,7 +774,7 @@ Note on the math: 1M in 6 months is roughly 40k impressions a week sustained, an
 - Posts shipped per week (target: 4). Shipped means it has a row in posts.csv.
 - Percentage of posts marked `run_again: +` shipped with zero human edits to the language (target 70%+ by week 4). Necessary, not sufficient. Read it alongside the §9 voice floor, since a more aggressive gate raises this number without improving the voice.
 - Median engagement rate vs that person's own trailing 20-post baseline
-- Unlocked anchors at run start, and net new inventory items per week (target 2+). Printed as one line: `N unlocked anchors, M posts of runway at current cadence`.
+- Unlocked anchors at run start, and net new inventory items per week (target 2+). Printed as one line: `N unlocked anchors, M posts of runway at current cadence`. **N is the pool minus the anchors used in the trailing 10 shipped pieces. M is the pool that has never anchored a shipped piece at all**, in posts, read as weeks against the cadence. Two different questions: N is whether the rotation can turn this week, M is how long before the engine starts retelling. M is deliberately not `pool minus 10`. The anchor lock is a rolling window, so every post frees the anchor falling out of it: a pool above 10 turns forever and a pool at or below 10 stalls dead. That is a cliff rather than a runway, it fails for the same reason the raw inventory-depth indicator below was deleted, and above the cliff it prints N a second time.
 - Gate recall and false-positive rate against `reference/gate-fixtures/`, reported whenever ai-tells.md changes
 
 **Deleted, and why, so they do not come back.** Gate catch rate trending down: there is no learner, each run is a fresh context reading the same files, §9's growing list should push the rate up rather than down, and success and the worst failure produce the same number. Inventory depth as a raw count: under a 10-post lock it can never fail, and a metric that cannot fail is noise. The impressions ramp (5k/wk month 1, 15k month 3, 40k+ month 5): it is derivable from the follower goal it was supposed to independently check. Per-run token counts: see §14.
@@ -792,7 +792,8 @@ From run one of §13 step 5. All five are computed or cost one character. A metr
 *Why first:* the alternative Joseph defects to is not ChatGPT, it is writing the post himself. A tool can pass its own headline metric and still be slower than the LinkedIn box.
 
 **2. Unlocked anchors and runway, printed at run start.** `engine.js locks` returns both. No collection step.
-*Threshold:* below 11 unlocked anchors the 10-post rotation cannot turn. Below 3 weeks of runway, the top-up stops being optional.
+*Threshold:* below 11 unlocked anchors the 10-post rotation cannot turn. Below 3 weeks of runway, which is 12 posts at the target cadence, the top-up stops being optional.
+*On the decay:* runway reaches 0 permanently on a profile that has told everything once, and that is the correct reading rather than a bug, because it is exactly when the interview stops being optional. If it nags rather than informs, the fallback is anchors unused in the last 90 days, which restores the gradient without inventing a growth model. Do not make that change before the number has read 0 on a real profile for a month.
 
 **3. Net new inventory items per week.** Counted from inventory.md appends. No collection step.
 *Threshold:* under 1.5 a week by week 6 means cadence is capped at what the pool supports, and the honest answer is dropping to 3 posts a week. Over 2 a week means the pool grows and cadence can rise. Under 1.5 at week 6 is also the one trigger that makes the review offer `/content-engine connect`, per §7c; above it, the harvest is buying nothing that costs anything.

@@ -706,13 +706,19 @@ function locks(profile) {
     pairs.push({ pair: b.fm.thesis_id + ' x ' + b.fm.hook_id, slug: b.slug, date: b.date });
   }
 
-  // ponytail: the PRD prints "N unlocked anchors, M posts of runway at current
-  // cadence" (section 12) and never defines M anywhere. This is the buffer
-  // above the stall point: with a 10-post anchor lock, a pool of P sustains
-  // the rotation for P - 10 more pieces before it must reuse a locked anchor,
-  // and section 12.1's floor of 11 falls straight out of it. Reported to the
-  // PRD as an undefined term rather than settled here.
-  const runway = Math.max(0, pool.length - ANCHOR_LOCK);
+  // Section 12: runway is the pool that has never anchored a shipped piece,
+  // printed in posts and read as weeks against the cadence.
+  //
+  // Not "pool minus the lock window". The anchor lock is a rolling window, so
+  // every post frees the anchor falling out of it: a pool above 10 turns
+  // forever and a pool at or below 10 stalls dead. That is a cliff rather than
+  // a runway, and above the cliff it prints unlocked_count a second time.
+  // Never-used is the only number here that falls when a piece ships and rises
+  // on a top-up, which is the shape the line is asked for.
+  const everUsed = new Set();
+  for (const b of briefs) if (b.fm.anchor) everUsed.add(b.fm.anchor);
+  const fresh = pool.map(it => it.id).filter(id => !everUsed.has(id));
+  const runway = fresh.length;
 
   return {
     check: 'locks',
@@ -721,6 +727,7 @@ function locks(profile) {
     unlocked_anchors: unlocked,
     unlocked_count: unlocked.length,
     locked_anchors: Array.from(lockedAnchors, ([id, slug]) => ({ id, by: slug })),
+    never_used_anchors: fresh,
     runway_posts: runway,
     rotation_healthy: unlocked.length >= ROTATION_FLOOR,
     hook_locked_recent: Array.from(hookRecent),
@@ -1035,7 +1042,7 @@ function selfTest() {
     // the superseded id has to leave the pool or a correction ships twice.
     assert.deepStrictEqual(lk.unlocked_anchors, ['g'],
       'a, b and c are anchor-locked, and d was superseded by g');
-    assert.strictEqual(lk.runway_posts, 0, 'a pool of 4 has no runway above the 10-post lock');
+    assert.strictEqual(lk.runway_posts, 1, 'only g has never anchored a shipped piece');
     assert.strictEqual(lk.rotation_healthy, false, 'one unlocked anchor cannot turn the rotation');
     assert.ok(lk.hook_locked_recent.includes('confession'), 'confession is inside the trailing 8');
     assert.strictEqual(lk.hook_counts_trailing_20.confession, 2, 'confession used twice in 20');
@@ -1059,6 +1066,22 @@ function selfTest() {
     assert.strictEqual(pl.shipped_pieces, 2, 'both pair briefs are shipped');
     assert.deepStrictEqual(pl.thesis_hook_pairs_locked_30d.map(x => x.pair), ['t1 x confession'],
       'a pair 3 days old is locked and one 60 days old is not');
+
+    // Runway and unlocked anchors have to be different numbers, or section
+    // 12.1 prints one number twice. An item last used 12 posts ago is unlocked
+    // and is not runway: the rotation can reach it, and reaching it is the
+    // engine retelling a story rather than telling one.
+    const runwayProfile = path.join(root, 'profiles', 'runway');
+    writeFixture(runwayProfile, 'inventory.md', '## Items\n\n' +
+      ['old', 'n1', 'n2'].map(id => '- id: ' + id + '\n  content: item ' + id + '\n  clearance: public\n').join('\n'));
+    for (let i = 1; i <= 12; i++) {
+      writeFixture(runwayProfile, 'runs/2026-03-' + String(i).padStart(2, '0') + '-r' + i + '/brief.md',
+        'anchor: ' + (i === 1 ? 'old' : 'x' + i) + '\nstatus: shipped\n');
+    }
+    const rw = locks(runwayProfile);
+    assert.strictEqual(rw.unlocked_count, 3, 'old fell out of the trailing 10, so all three are unlocked');
+    assert.strictEqual(rw.runway_posts, 2, 'but old has been told, so it is not runway');
+    assert.deepStrictEqual(rw.never_used_anchors, ['n1', 'n2'], 'runway names the untold ones');
 
     // An empty profile must not throw.
     const bare = path.join(root, 'profiles', 'bare');

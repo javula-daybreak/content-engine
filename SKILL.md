@@ -86,6 +86,9 @@ Four things may print, in this order, and none of them blocks. Enter proceeds.
 
 1. Up to three signal lines from `runs/signals.md`, per PRD section 7b.
 2. The runway line: `N unlocked anchors, M posts of runway at current cadence`.
+   N excludes anchors used in the trailing 10 shipped pieces; M counts anchors
+   never used at all. `engine.js locks` returns both, and neither is judged by
+   reading. See PRD section 12.
 3. One staleness line, most urgent wins, and only for files this run loaded.
    Intervals: identity 180 days, audience 120, voice 90, thesis 90, inventory
    30. `inspiration.md` and `theme.json` never go stale.
