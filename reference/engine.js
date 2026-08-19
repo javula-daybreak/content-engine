@@ -68,6 +68,9 @@ const HASHTAG_STACK = 3;
 // Section 9: zero contractions is a tell. Below this many words it is not
 // evidence of anything, so a two-line post does not fire it.
 const CONTRACTION_FLOOR_WORDS = 40;
+// Section 9 bound 3. Tuned at section 13.2 step 8 against ten real posts.
+const REWRITE_CAP_PER = 3;
+const REWRITE_CAP_WORDS = 200;
 // Section 9: "every paragraph the same number of lines". Three paragraphs is
 // the fewest that shows a pattern rather than a coincidence.
 const UNIFORM_PARA_MIN = 3;
@@ -683,15 +686,22 @@ function lexicalText(draft, opts, privateTerms, briefFound) {
   const rewritable = hits.filter(h => !h.protected);
   const protectedHits = hits.filter(h => h.protected);
 
+  // A hashtag stack is one rewrite. Section 9 bound 2's "substitute, never
+  // subtract" is scoped to lexical tells, so deleting the stack is the fix
+  // rather than a defect in the fix. Counting it here is what lets bound 3's
+  // cap see it, and what stops `action` reporting 'none' on a draft this same
+  // object has already marked failed.
+  const stack = hashtags.length >= HASHTAG_STACK;
+
   return {
     check: 'lexical',
-    pass: rewritable.length === 0 && hashtags.length < HASHTAG_STACK && privateHits.length === 0,
+    pass: rewritable.length === 0 && !stack && privateHits.length === 0,
     format: opts.short ? 'short' : 'any',
-    action: privateHits.length ? 'reject' : (rewritable.length ? 'rewrite' : 'none'),
-    rewrite_count: rewritable.length,
+    action: privateHits.length ? 'reject' : ((rewritable.length || stack) ? 'rewrite' : 'none'),
+    rewrite_count: rewritable.length + (stack ? 1 : 0),
     hits: rewritable,
     not_rewritten_quoted_or_factual: protectedHits,
-    hashtags: { count: hashtags.length, stack: hashtags.length >= HASHTAG_STACK },
+    hashtags: { count: hashtags.length, stack },
     private_terms: {
       // "checked: 0" reads as "nothing to guard". Say which one it was.
       brief: briefFound ? 'found' : 'missing',
@@ -1124,13 +1134,29 @@ function gateHooks(file) {
       convention: 'an example line is a line starting with "> ".',
     };
   }
+  // Consecutive blockquote lines are one example, joined before scanning. An
+  // example that wraps is the normal case in a file kept under 80 columns, and
+  // scanning the halves separately splits every pattern that straddles the
+  // break: "isn't the problem." on one line and "X is." on the next clears a
+  // check that exists to be uncircumventable.
   const lines = readFile(file).split(/\r?\n/);
-  const violations = [];
-  let n = 0;
+  const examples = [];
   lines.forEach((line, i) => {
     if (!/^\s*>\s+\S/.test(line)) return;
-    n++;
-    const body = line.replace(/^\s*>\s+/, '');
+    const body = line.replace(/^\s*>\s+/, '').trim();
+    const prev = examples[examples.length - 1];
+    if (prev && prev.end === i - 1) {
+      prev.text += ' ' + body;
+      prev.end = i;
+    } else {
+      examples.push({ line: i + 1, end: i, text: body });
+    }
+  });
+
+  const violations = [];
+  const n = examples.length;
+  examples.forEach(ex => {
+    const body = ex.text;
     const got = firedTags(body, null, true);
     // The absence checks measure a whole post. One quoted hook line has no
     // paragraphs, no baseline and nothing to name, so they are not violations
@@ -1138,7 +1164,7 @@ function gateHooks(file) {
     const real = got.tags.filter(x => !['specifics-floor', 'no-fragments',
       'no-long-sentence', 'zero-contractions', 'we-with-no-human',
       'uniform-paragraphs'].includes(x));
-    if (real.length) violations.push({ line: i + 1, text: body, fired: real });
+    if (real.length) violations.push({ line: ex.line, text: body, fired: real });
   });
   return {
     check: 'gate', mode: 'hooks',
@@ -1147,6 +1173,69 @@ function gateHooks(file) {
     example_lines: n,
     violations,
     convention: 'an example line is a line starting with "> ".',
+  };
+}
+
+// Section 13.2 step 5: gate-report.md logs gate_catch_count, a per-tell tag
+// list, and gate_passes. All three are counts over the two scans this file
+// already runs, and a count the model derives by adding two JSON arrays is the
+// self-witnessed number section 13.1 exists to stop. One call returns the whole
+// audit trail so gate-report.md quotes one object rather than stitching three.
+//
+// It reports the twenty-three engine-owned tells. The seven judged ones are
+// named in model_owned, so a clean report cannot be read as a clean draft.
+//
+// Not included: verbatim overlap. That is lock 5 and it belongs to the
+// repetition guard at step 6, which calls `overlap` and `locks` directly.
+function gateReport(draftPath, profile) {
+  const lx = lexical(draftPath, { short: true });
+  const st = stats(draftPath, profile ? profile : null);
+
+  const tags = new Set();
+  for (const h of lx.hits) tags.add(h.tag);
+  if (lx.hashtags.stack) tags.add('hashtag-stack');
+  // private_terms violations sit outside hits because they are a rejection
+  // rather than a rewrite. They are still a tell and still belong in the list.
+  if (lx.private_terms.violations.length) tags.add('private-terms');
+  for (const f of st.flags) tags.add(f.rule);
+
+  const catches = lx.hits.length + lx.private_terms.violations.length +
+    st.flags.length + (lx.hashtags.stack ? 1 : 0);
+
+  // Section 9 bound 3, "cap rewrites at 3 per 200 words", read as a rate with
+  // the first bucket whole: a 140-word post gets 3 and a 250-word post gets 6.
+  // Rounding the fraction down instead puts the cap at 1 on a normal short
+  // post and fires the redraft path on almost every run. The 3 is a knob
+  // section 13.2 step 8 tunes against ten real posts, not a measured constant.
+  const words = st.measured.words;
+  const cap = REWRITE_CAP_PER * Math.max(1, Math.ceil(words / REWRITE_CAP_WORDS));
+
+  const redraft = st.flags.some(f => f.action === 'redraft');
+  const rewrites = lx.rewrite_count + st.flags.filter(f => f.action === 'rewrite').length;
+  const reject = lx.private_terms.violations.length > 0;
+  const flagged = st.flags.filter(f => f.action === 'flag').length;
+
+  return {
+    check: 'gate', mode: 'report',
+    // An edit was required, of any kind. A flag is information for the human
+    // and changes no word, so it does not fail the gate. `flagged` is reported
+    // beside this, so a pass carrying a voice floor is never read as silence.
+    gate_passes: !reject && !redraft && rewrites === 0,
+    gate_catch_count: catches,
+    tags: [...tags].sort(),
+    action: reject ? 'reject' : (redraft ? 'redraft' : (rewrites ? 'rewrite' : (flagged ? 'flag' : 'none'))),
+    rewrites_required: rewrites,
+    rewrite_cap: cap,
+    over_cap: rewrites > cap,
+    flagged,
+    words,
+    format: 'short',
+    // Section 9 bound 4. Reported under its own heading, never edited.
+    not_rewritten_quoted_or_factual: lx.not_rewritten_quoted_or_factual,
+    lexical: lx,
+    stats: st,
+    model_owned: TELLS.filter(x => !x.tag).map(x => x.id),
+    note: 'engine-owned tells only. over_cap true is section 9 bound 3: return to brief.md and redraft once with the tripped rules as constraints.',
   };
 }
 
@@ -1698,6 +1787,143 @@ function selfTest() {
     assert.strictEqual(gateHooks(hooksOk).pass, true, 'and a clean example line passes');
     assert.strictEqual(gateHooks(hooksOk).violations.length, 0, 'with nothing to report');
 
+    // An example wrapping to a second line is one example, not two. Scanning
+    // the halves separately is how the same banned pattern above ships anyway,
+    // and hooks.md wraps its longer examples, so this is live rather than
+    // hypothetical.
+    //
+    // Three lines rather than two, so the reported line number can be wrong.
+    // On a two-line example the opening line and the closing index are the same
+    // number by coincidence, and an assert against it proves nothing.
+    const hooksWrap = writeFixture(tellDir, 'hooks-wrap.md',
+      '# Hooks\n\n## The correction\n\n> It' + APOS + 's not a process\n> problem, it' + APOS +
+      's a memory\n> problem here.\n');
+    const hw = gateHooks(hooksWrap);
+    assert.strictEqual(hw.example_lines, 1, 'a run of blockquote lines is one example');
+    assert.strictEqual(hw.violations.length, 1, 'and the pattern across the breaks is caught');
+    assert.strictEqual(hw.violations[0].line, 5, 'reported at the line the example opens on');
+    assert.ok(/process problem, it/.test(hw.violations[0].text), 'joined with single spaces');
+
+    // ---- gate --report ----
+    //
+    // Section 13.2 step 5's three logged values. Every fixture below isolates
+    // one condition, because a draft that trips three rules cannot show which
+    // of the three the report is actually reading.
+    const REPBODY = 'I checked the numbers again on Monday morning, and the gap between ' +
+      'what the forecast said and what the warehouse actually moved turned out to ' +
+      'be wider than anyone in that room wanted to admit out loud.';
+    const HELD = '\n\nIt didn' + APOS + 't hold.\n';
+    const PT = 'anchor: a\nprivate_terms: ["Northwind"]\nstatus: drafted\n';
+    let repN = 0;
+    const rep = (body, brief) => {
+      const d = path.join(root, 'rep' + (++repN));
+      if (brief) writeFixture(d, 'brief.md', brief);
+      return gateReport(writeFixture(d, 'draft.md', body), null);
+    };
+
+    const rClean = rep('Acme shipped 41 units.\n\n' + REPBODY + HELD);
+    assert.strictEqual(rClean.gate_passes, true, 'a draft tripping nothing passes');
+    assert.strictEqual(rClean.gate_catch_count, 0, 'with no catches');
+    assert.deepStrictEqual(rClean.tags, [], 'and an empty tag list');
+    assert.strictEqual(rClean.action, 'none', 'and nothing for the run to do');
+    assert.strictEqual(rClean.rewrite_cap, 3, 'a short post gets the first whole bucket of bound 3');
+
+    // Every sentence at or over 6 words with one over 25, so the fragment floor
+    // fires alone. A flag changes no word, which is the one distinction in this
+    // report that a reader can get backwards in both directions.
+    const rFlag = rep('Acme shipped 41 units in March and nobody noticed.\n\n' + REPBODY +
+      '\n\nIt didn' + APOS + 't hold up when the auditors came through in April.\n');
+    assert.strictEqual(rFlag.gate_passes, true, 'a flag edits no word, so the gate still passes');
+    assert.strictEqual(rFlag.action, 'flag', 'and the run is told there is something to read');
+    assert.strictEqual(rFlag.flagged, 1, 'reported beside the pass rather than swallowed by it');
+    assert.strictEqual(rFlag.gate_catch_count, 1, 'and counted, because a pass is not silence');
+    assert.deepStrictEqual(rFlag.tags, ['no-fragments'], 'tagged by id, per section 13.2 step 5');
+
+    // Each of the three failing verdicts alone. Section 9 gives them different
+    // repairs, so a report that collapses any two of them sends the run to the
+    // wrong one.
+    const rReject = rep('Northwind shipped 41 units.\n\n' + REPBODY + HELD, PT);
+    assert.strictEqual(rReject.action, 'reject', 'a private term rejects');
+    assert.strictEqual(rReject.gate_passes, false, 'and cannot pass');
+    assert.strictEqual(rReject.gate_catch_count, 1, 'counted, though it is not in hits');
+    assert.deepStrictEqual(rReject.tags, ['private-terms'], 'and tagged, though it is not a rewrite');
+
+    const rRedraft = rep('I did not check the numbers again on monday morning, and the gap ' +
+      'between what the forecast said and what the warehouse actually moved turned out ' +
+      'to be wider than anyone in that room wanted to admit out loud.' + HELD);
+    assert.strictEqual(rRedraft.action, 'redraft', 'naming nothing is a redraft, not a rewrite');
+    assert.strictEqual(rRedraft.gate_passes, false, 'and it fails the gate');
+    assert.deepStrictEqual(rRedraft.tags, ['specifics-floor'], 'tagged alone');
+
+    const rRewrite = rep('Acme shipped 41 units.\n\nI checked the robust numbers again on ' +
+      'Monday morning, and the gap between what the forecast said and what the warehouse ' +
+      'actually moved turned out to be wider than anyone in that room wanted to admit ' +
+      'out loud.' + HELD);
+    assert.strictEqual(rRewrite.action, 'rewrite', 'one banned word is a rewrite');
+    assert.strictEqual(rRewrite.gate_passes, false, 'and an edit is a failure');
+    assert.strictEqual(rRewrite.rewrites_required, 1, 'counted once');
+
+    // Precedence. A draft that is both rejected and redrafted is rejected:
+    // rewriting a disclosure only produces a better-written disclosure.
+    const rBoth = rep('Northwind did not hold up.\n\nnothing else here names a thing or ' +
+      'counts one, and the sentence runs on long enough that the floor for a long ' +
+      'sentence does not fire on this draft either.\n\nIt didn' + APOS + 't work.\n', PT);
+    assert.strictEqual(rBoth.action, 'reject', 'reject outranks redraft');
+    assert.strictEqual(rBoth.gate_catch_count, 2, 'and both are still counted');
+
+    // A stats rewrite is a rewrite. Three paragraphs of two lines each, with
+    // nothing lexical in them, so the count can only have come from stats.
+    const rUniform = rep('Acme shipped 41 units in March.\nIt didn' + APOS + 't hold.\n\n' +
+      'The warehouse team checked every pallet against the manifest before the truck ' +
+      'left the yard that afternoon and found nothing wrong with any of them at all.\n' +
+      'Nobody said anything.\n\nI checked again on Monday.\nThe gap was still there.\n');
+    assert.strictEqual(rUniform.lexical.rewrite_count, 0, 'nothing lexical in this draft');
+    assert.strictEqual(rUniform.rewrites_required, 1, 'so the rewrite came from stats');
+    assert.strictEqual(rUniform.action, 'rewrite', 'and it is a rewrite');
+
+    // Bound 3's cap, and the semicolon rule, which is short-post scoped and is
+    // the reason this mode does not take a format argument.
+    const rSemi = rep('Acme shipped 41 units.\n\nI checked the robust numbers again on ' +
+      'Monday morning; the gap between what the forecast said and what the warehouse ' +
+      'actually moved turned out to be wider than anyone in that room wanted to admit ' +
+      'out loud.' + HELD);
+    assert.deepStrictEqual(rSemi.tags, ['banned', 'semicolon'],
+      'a report is read across runs, so the tag list is sorted and the semicolon fires');
+
+    const rOver = rep('Acme shipped 41 units.\n\nI checked the robust numbers again on ' +
+      'Monday morning, and the seamless gap between what the forecast said and what the ' +
+      'warehouse actually moved turned out to be a testament to how they leverage that ' +
+      'yard.' + HELD);
+    assert.strictEqual(rOver.rewrites_required, 4, 'four banned words');
+    assert.strictEqual(rOver.rewrite_cap, 3, 'against a cap of three');
+    assert.strictEqual(rOver.over_cap, true, 'so bound 3 sends this one back to the brief');
+
+    // A hashtag stack is not in `hits` and is still a rewrite. Before this
+    // fixture existed the report said `gate_passes: false` and `action: none`,
+    // which tells a run something is wrong and not what to do about it.
+    const rTags = rep('Acme shipped 41 units.\n\n' + REPBODY + HELD +
+      '\n#supplychain #ops #logistics\n');
+    assert.strictEqual(rTags.gate_catch_count, 1, 'the stack is one catch');
+    assert.deepStrictEqual(rTags.tags, ['hashtag-stack'], 'tagged');
+    assert.strictEqual(rTags.rewrites_required, 1, 'and one rewrite, so bound 3 can see it');
+    assert.strictEqual(rTags.action, 'rewrite', 'with something for the run to actually do');
+
+    // An empty draft.md is a real state: a crash between step 3 and step 4
+    // leaves one. The cap keeps its first bucket rather than going to zero.
+    const rEmpty = rep('');
+    assert.strictEqual(rEmpty.words, 0, 'an empty draft measures zero words');
+    assert.strictEqual(rEmpty.rewrite_cap, 3, 'and still reports a usable cap');
+
+    // The cap is a rate, and the second bucket is where the arithmetic shows.
+    const repLong = writeFixture(path.join(root, 'replong'), 'draft.md',
+      'Acme moved 41 units in March. ' +
+      ('The warehouse team checked every pallet against the manifest before the ' +
+       'truck left the yard that afternoon. ').repeat(12));
+    const rl = gateReport(repLong, null);
+    assert.ok(rl.words > 200, 'fixture is past the first bucket');
+    assert.strictEqual(rl.rewrite_cap, 6, 'so the cap is two buckets, not one');
+    assert.strictEqual(rl.model_owned.length, 7, 'and the judged tells are named, not implied clean');
+
     // ------------------------------------- the false-positive half of step 4
     //
     // Section 12.1 metric 4 is the false-positive rate, and section 9 says a
@@ -1864,6 +2090,7 @@ function main(argv) {
       return locks(need(args[0], 'profile directory'));
     case 'gate': {
       const here = f => path.join(__dirname, f);
+      if (rest.includes('--report')) return gateReport(need(args[0], 'draft'), args[1] || null);
       if (rest.includes('--tells')) return gateTells(args[0] || here('ai-tells.md'));
       if (rest.includes('--hooks')) return gateHooks(args[0] || here('hooks.md'));
       if (rest.includes('--negative')) return gateNegative(need(args[0], 'profile directory'));
@@ -1882,5 +2109,5 @@ if (require.main === module) {
 
 module.exports = {
   overlap, lexical, stats, locks, measure, selfTest,
-  gateFixtures, gateNegative, gateHooks, gateTells, TELLS,
+  gateFixtures, gateNegative, gateHooks, gateTells, gateReport, TELLS,
 };

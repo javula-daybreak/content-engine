@@ -328,7 +328,9 @@ this tell and does not fire.
 
 **Fires on:** three or more hashtags. Three is a stack.
 **Owner:** engine (`hashtag-stack`).
-**Rewrite:** keep at most two, or none.
+**Rewrite:** keep at most two, or none. Deleting them is the correct repair and
+not a violation of bound 2, which is scoped to lexical tells. It counts as one
+rewrite against bound 3's cap.
 
 ### title-case-header
 
@@ -459,3 +461,15 @@ same pattern re-adds it, and the reason it failed is gone.
 - **2026-08-18.** Section 9's voice-floor fallback split into `no-fragments` and
   `no-long-sentence`. One tag covering both meant a fixture expecting no
   fragments passed on the unrelated half, which is a test that cannot fail.
+- **2026-08-18.** Step 5. `gate --report <draft> [profile]` added: the one gate
+  mode that runs on a real draft, returning section 13.2 step 5's three logged
+  values plus the bound 3 cap in one object. `gate --hooks` went live the same
+  day, since `reference/hooks.md` is what it reads, and it now joins a run of
+  consecutive `> ` lines into one example before scanning. Scanning the halves
+  separately let a banned pattern ship in the hook library by wrapping across
+  the line break.
+- **2026-08-18.** `hashtag-stack` now sets `action: rewrite` and counts one
+  against the cap. It had been reporting `pass: false` with `action: none`,
+  which tells a run something is wrong and not what to do about it, and kept
+  the only tell that is a deletion invisible to bound 3's arithmetic. No rule
+  changed about when it fires.

@@ -158,6 +158,11 @@ status: drafted
 `private_terms:` holds every proper noun, numeral, and distinctive phrase whose
 only source is a `visibility: private` signal.
 
+`hook_id:` names a pattern in `reference/hooks.md`, chosen from the shape of the
+anchor and from what `engine.js locks` reports as unlocked. **The id is the
+contract**: rename a pattern and every brief written before the rename points at
+nothing, and lock 3 stops binding without saying so.
+
 ### Step 5: the gate
 
 `reference/ai-tells.md` runs on every draft before the human sees it, including
@@ -204,7 +209,7 @@ Tag `gate-report.md` with those ids, not with prose, because PRD section 13.2
 step 5 asks for a per-tell tag list and a tag has to match something. The ids
 are what `gate-fixtures/expected.md` references and what the ownership table in
 `engine.js` keys on, and `node reference/engine.js gate --tells` fails when the
-file and the table disagree. Run the four `gate` modes whenever `ai-tells.md`
+file and the table disagree. Run the four harness modes whenever `ai-tells.md`
 changes:
 
 ```
@@ -218,6 +223,46 @@ Retiring a rule is a real move, not a defeat. A tell that fires on this person's
 own writing gets struck through in `ai-tells.md` with the date and the reason. It
 stops firing and stays visible, because a wrong rule costs a rewrite of good
 writing on every future draft forever.
+
+#### gate-report.md
+
+The fifth mode is the one that runs on a real draft, and one call produces the
+whole report:
+
+```
+node reference/engine.js gate --report runs/<slug>/draft.md profiles/<handle>
+```
+
+Quote that JSON verbatim at the top of the file. It carries `gate_catch_count`,
+the per-tell `tags` list, `gate_passes`, and the `rewrite_cap` bound 3 measures
+against. **Do not recompute any of them by reading.** A count derived by adding
+two JSON arrays together is the self-witnessed number this whole split exists to
+prevent.
+
+Then four headings, any of which may be empty:
+
+- **`rewritten`**, one line per change: the tag, the span before, the span after.
+- **`not rewritten: quoted or factual`**, copied from the JSON. Never edited.
+- **`overrides`**, one line per tell that did not fire because `voice.md` won,
+  naming the habit it lost to.
+- **`unresolved`**, what bound 3 could not clear after the redraft.
+
+**The run prints one line, not the file**, directly above the post, and only when
+the gate caught something:
+
+```
+gate: <n> caught, <n> rewritten, <n> flagged
+```
+
+with ` · unresolved: <tags>` appended when bound 3 ran out. A run that caught
+nothing prints no gate line at all, the same way the staleness line and the
+sibling notice already work, and `gate_passes: true` is still written to the
+file. A flag changes no word, so it does not fail the gate, but it is counted on
+that line rather than swallowed by the pass.
+
+**Never show the post before `gate-report.md` exists in the run directory.**
+That is the mechanical version of "the gate is not advisory": one existence
+check instead of a promise.
 
 ### Step 8: log and ship
 
@@ -243,8 +288,25 @@ End every run with `Shipped as written? [y/n]`.
 
 `y` copies `draft.md` to `runs/<slug>/shipped.md`, flips `brief.md`'s `status:`
 to `shipped`, and appends the `posts.csv` row. `n` prompts for a paste, or
-defers to the weekly review. `minutes_to_ship` is computed from wall clock,
-never typed.
+defers to the weekly review.
+
+**The posts.csv row.** The header is frozen in PRD section 11. Ship writes only
+the columns it can observe: `run_slug`, `shipped_at`, `shipped_verbatim`,
+`minutes_to_ship`, and `hit_limit` when the human says the session was
+interrupted.
+
+`run_again`, `post_url`, `followers_at_post`, `reactions`, `comments` and
+`reposts` are left **empty**, and empty is not zero. Empty means not collected
+yet; zero means measured zero. Section 11 divides the score by follower count
+and excludes every `run_again: -` post from the median, so a zero written where
+a blank belongs turns an uncollected post into a measured failure. Review fills
+those columns later.
+
+`minutes_to_ship` is wall clock: read the clock once at step 1 and once here,
+and subtract. Never ask for it, never estimate it. Ceiling: a run somebody
+walked away from mid-draft records the walk. Section 12.1 reads the median over
+a rolling 20, which absorbs that, and it is not worth a second timestamp field
+to fix.
 
 ## 3. Where writes are allowed
 

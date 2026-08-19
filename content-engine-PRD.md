@@ -850,7 +850,7 @@ Node, no npm dependencies, four subcommands at this step and a fifth, `gate`, ad
 - **`lexical <draft>`** scans the banned list, em dash, semicolons in short posts, hashtag counts, Title Case headers.
 - **`stats <draft>`** returns sentence-length stdev, contraction rate, comma density, specifics count.
 - **`locks <profile>`** globs `runs/*/brief.md`, returns unlocked anchors, hook patterns used in the trailing 8 and 20, archetypes used in the trailing 5 shipped visual pieces, and the runway number.
-- **`gate`**, added at step 4, is the harness rather than the gate: recall over `gate-fixtures/`, the negative control over a profile's pasted samples, the `hooks.md` example-line check, and the drift check between `ai-tells.md` and the tell table. See §13.2 step 4.
+- **`gate`** has five modes across two jobs. Four are the harness, added at step 4: recall over `gate-fixtures/`, the negative control over a profile's pasted samples, the `hooks.md` example-line check, and the drift check between `ai-tells.md` and the tell table. See §13.2 step 4. The fifth, **`gate --report <draft> [profile]`**, is added at step 5 and is the only mode that runs on a real draft. It returns §13.2 step 5's three logged values in one object, plus the rewrite cap §9 bound 3 measures against, so gate-report.md quotes one result rather than the model adding two JSON arrays together and writing down the total.
 
 Output is JSON that gate-report.md quotes verbatim. It lives in `reference/` because §1.2 already ships all of `reference/`, so it needs no new line in the ships list. It writes nothing outside `profiles/<handle>/`.
 
@@ -880,8 +880,9 @@ Hold these as the definition of done. They need no further PRD edit; they are th
 
 **Step 5, short posts**
 - brief.md front matter is written at pipeline step 3, before drafting, so it survives a crash at render.
-- The run prints exactly one line above the post (`angle · anchor · job`), the post, the four rejected angles as one-liners, and the ship question. Nothing else. That is the testable version of "one keystroke."
-- gate-report.md logs `gate_catch_count`, a per-tell tag list, and `gate_passes`. Print one summary line by default, not the itemization. Keep the file; it is the audit trail on the only component that silently edits the human.
+- The run prints exactly one line above the post (`angle · anchor · job`), the post, the four rejected angles as one-liners, and the ship question. One gate line joins that list, directly above the post, and only on a run where the gate caught something. Nothing else. That is the testable version of "one keystroke."
+- gate-report.md logs `gate_catch_count`, a per-tell tag list, and `gate_passes`, quoting `engine.js gate --report` verbatim rather than stitching two scans together in prose. **This is where that bullet and §9 meet, and they were in contradiction until step 5 resolved them.** §9 says to show a diff of what changed and why, and the bullet above says nothing else prints. Both hold: the diff is written to the file on every run, and the run prints the one-line summary of it. Nothing is hidden and the run does not become a dashboard. A run that caught nothing prints no gate line at all, the same way the staleness line and the sibling notice already work, and the file still records the pass. Keep the file; it is the audit trail on the only component that silently edits the human.
+- No run shows the post before gate-report.md exists in the run directory. That is the mechanical version of "the gate is not advisory", and it is one existence check rather than a promise.
 
 **Step 6, repetition guard**
 - Reads brief.md front matter and calls `engine.js locks` and `engine.js overlap`. Nothing model-judged.
