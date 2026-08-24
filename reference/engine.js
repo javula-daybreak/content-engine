@@ -21,6 +21,7 @@
 //   node reference/engine.js stats   <draft.md> [profile-dir]
 //   node reference/engine.js locks   <profile-dir>
 //   node reference/engine.js gate    [fixtures-dir]
+//   node reference/engine.js gate    --report <draft.md> [profile-dir] [--long]
 //   node reference/engine.js gate    --negative <profile-dir>
 //   node reference/engine.js gate    --hooks [hooks.md]
 //   node reference/engine.js gate    --tells [ai-tells.md]
@@ -304,8 +305,15 @@ function jaccard(a, b) {
 
 // Every profile file documents its own schema in a fenced block, and that
 // example is a syntactically perfect item. Strip fences before reading items,
-// or "<short-kebab-slug>" ships as a real anchor. voice.md is the exception
-// and is read fence-and-all, because its frozen measurements live inside one.
+// or "<short-kebab-slug>" ships as a real anchor.
+//
+// This strips for every caller with no exception, voice.md included: its
+// Samples fence holds the same placeholder schema, and keeping it would hand
+// section 13.2 step 4's negative control a corpus of "<verbatim>". The one
+// reader that keeps fences is voiceMeasures, which reaches past this function
+// and never calls it, because section 6's four frozen measurements are typed
+// inside a fence and stripping it would erase the baseline the voice floor
+// measures against. Both halves are pinned by assert, in both directions.
 function stripFences(text) {
   return text.replace(/^```[\s\S]*?^```/gm, '');
 }
@@ -1185,11 +1193,32 @@ function gateHooks(file) {
 // It reports the twenty-three engine-owned tells. The seven judged ones are
 // named in model_owned, so a clean report cannot be read as a clean draft.
 //
-// Not included: verbatim overlap. That is lock 5 and it belongs to the
-// repetition guard at step 6, which calls `overlap` and `locks` directly.
-function gateReport(draftPath, profile) {
-  const lx = lexical(draftPath, { short: true });
+// Lock 5, verbatim overlap, runs here as well. SKILL.md step 2 defers it
+// because it has no draft yet, and step 6 is the design gate on visual runs
+// only, so a short post reaches no other caller: this is its invocation site.
+// It stays out of `tags` and `gate_catch_count`, which section 13.2 step 5
+// defines over the tell table, and reports as its own block instead, because a
+// failure names a prior slug and a span and neither survives a tag list.
+function gateReport(draftPath, profile, format) {
+  // Only 'long' opts out. An absent format and a misspelled one both land on
+  // 'short', because short is the stricter scope: section 9's semicolon rule
+  // is short-post only, and a typo that silently widened the format would
+  // retire a live rule without anyone asking for it.
+  const fmt = format === 'long' ? 'long' : 'short';
+  const lx = lexical(draftPath, { short: fmt === 'short' });
   const st = stats(draftPath, profile ? profile : null);
+
+  // Section 3's only hard fail. With no profile there is no prior corpus, so
+  // the block says it did not run and carries no verdict at all: a check that
+  // reports `pass: true` on nothing it read is the same defect as "fires: 0"
+  // over an empty corpus, which the negative control already guards against.
+  const ov = profile ? { ran: true, ...overlap(draftPath, profile) } : {
+    check: 'overlap',
+    ran: false,
+    reason: 'no profile directory was passed, so no prior corpus was read. ' +
+      'Lock 5 did not run on this draft, and this is not a pass.',
+  };
+  const overlapFails = ov.ran && !ov.pass;
 
   const tags = new Set();
   for (const h of lx.hits) tags.add(h.tag);
@@ -1210,7 +1239,11 @@ function gateReport(draftPath, profile) {
   const words = st.measured.words;
   const cap = REWRITE_CAP_PER * Math.max(1, Math.ceil(words / REWRITE_CAP_WORDS));
 
-  const redraft = st.flags.some(f => f.action === 'redraft');
+  // A repeated span is a redraft. Patching it produces a differently worded
+  // repetition, and it discloses nothing, so it is neither a rewrite nor a
+  // rejection. Overlap *warnings* are the spans section 13.1 traces back to
+  // inventory or thesis.md, and those are citations: they never fail anything.
+  const redraft = st.flags.some(f => f.action === 'redraft') || overlapFails;
   const rewrites = lx.rewrite_count + st.flags.filter(f => f.action === 'rewrite').length;
   const reject = lx.private_terms.violations.length > 0;
   const flagged = st.flags.filter(f => f.action === 'flag').length;
@@ -1220,22 +1253,32 @@ function gateReport(draftPath, profile) {
     // An edit was required, of any kind. A flag is information for the human
     // and changes no word, so it does not fail the gate. `flagged` is reported
     // beside this, so a pass carrying a voice floor is never read as silence.
+    // A lock 5 failure joins this through `redraft`, because section 3 calls it
+    // a hard fail and the run has to go back to brief.md either way.
     gate_passes: !reject && !redraft && rewrites === 0,
     gate_catch_count: catches,
     tags: [...tags].sort(),
+    // Precedence, highest first: reject > redraft > rewrite > flag > none.
+    // Each verdict sends the run somewhere different, so the order is the
+    // whole content of this line and it is written out rather than implied.
     action: reject ? 'reject' : (redraft ? 'redraft' : (rewrites ? 'rewrite' : (flagged ? 'flag' : 'none'))),
     rewrites_required: rewrites,
     rewrite_cap: cap,
     over_cap: rewrites > cap,
     flagged,
     words,
-    format: 'short',
+    format: fmt,
+    // Zero priors is the real state of run one and it reads exactly like a
+    // clean comparison unless the number is on the surface. null means the
+    // check never ran, which is a third thing again.
+    overlap_priors_compared: ov.ran ? ov.priors_compared : null,
     // Section 9 bound 4. Reported under its own heading, never edited.
     not_rewritten_quoted_or_factual: lx.not_rewritten_quoted_or_factual,
     lexical: lx,
     stats: st,
+    overlap: ov,
     model_owned: TELLS.filter(x => !x.tag).map(x => x.id),
-    note: 'engine-owned tells only. over_cap true is section 9 bound 3: return to brief.md and redraft once with the tripped rules as constraints.',
+    note: 'gate_catch_count and tags are engine-owned tells only. over_cap true is section 9 bound 3: return to brief.md and redraft once with the tripped rules as constraints. Lock 5 is reported under overlap and is counted nowhere else, so read that block rather than the tag list for it.',
   };
 }
 
@@ -1732,6 +1775,46 @@ function selfTest() {
     assert.strictEqual(gateTells(path.join(root, 'nope.md')).pass, false,
       'and an absent ai-tells.md is a failure, not a clean table');
 
+    // ---------------------------- voice.md's two readers, and their split
+    //
+    // One file, two parsers, opposite fence behaviour, and each is correct.
+    // Nobody reading one can see the other, so the split is pinned from both
+    // sides: unifying it empties either the negative control's corpus or
+    // section 9's voice floor, and both failures are silent.
+    const F = '`' + '`' + '`';
+    const voiceBoth =
+      '## The four measured values\n\n' +
+      F + '\navg_sentence_length: 14\nsentence_length_stdev: 9\n' +
+      'contraction_rate: 6\nuses_fragments: yes\n' + F + '\n\n' +
+      '## Samples\n\n' +
+      F + '\n- source: pasted\n  kind: <slack message>\n  text: |\n    <verbatim>\n' + F + '\n\n' +
+      '- source: pasted\n  kind: slack message\n  text: |\n' +
+      '    the deck was late. Dana found the error.\n';
+
+    const vmBoth = voiceMeasures(voiceBoth);
+    assert.strictEqual(vmBoth.avg_sentence_length, 14,
+      'voiceMeasures reads a number typed inside the fence, because it never strips one');
+    assert.strictEqual(vmBoth.uses_fragments, 'yes', 'and the same for the yes/no key');
+
+    const vsBoth = voiceSamples(voiceBoth);
+    assert.strictEqual(vsBoth.length, 1, 'while voiceSamples strips, so the schema example is not a sample');
+    assert.ok(!vsBoth.some(x => x.text.includes('<verbatim>')),
+      'the placeholder never reaches the corpus, which is what makes zero fires mean something');
+    assert.ok(vsBoth[0].text.startsWith('the deck was late'), 'only the entry below the fence is read');
+
+    // The template ships the four keys empty inside that fence, so a
+    // first-match read returns null for every profile whose numbers were
+    // appended below it rather than typed into it.
+    const voiceTemplate =
+      F + '\navg_sentence_length:\nsentence_length_stdev:\ncontraction_rate:\n' +
+      'uses_fragments: yes | no\n' + F + '\n\n' +
+      'avg_sentence_length: 17\nsentence_length_stdev: 11\n' +
+      'contraction_rate: 4\nuses_fragments: no\n';
+    const vmTemplate = voiceMeasures(voiceTemplate);
+    assert.strictEqual(vmTemplate.avg_sentence_length, 17,
+      'first parseable value wins over first match, or the placeholder is the baseline');
+    assert.strictEqual(vmTemplate.uses_fragments, 'no', 'and "yes | no" is a prompt, not an answer');
+
     // The negative control. Zero fires is the pass bar, and an empty corpus is
     // not zero fires.
     const negProfile = path.join(root, 'profiles', 'negative');
@@ -1882,13 +1965,34 @@ function selfTest() {
     assert.strictEqual(rUniform.action, 'rewrite', 'and it is a rewrite');
 
     // Bound 3's cap, and the semicolon rule, which is short-post scoped and is
-    // the reason this mode does not take a format argument.
+    // therefore the rule the format argument is measured on, two blocks below.
     const rSemi = rep('Acme shipped 41 units.\n\nI checked the robust numbers again on ' +
       'Monday morning; the gap between what the forecast said and what the warehouse ' +
       'actually moved turned out to be wider than anyone in that room wanted to admit ' +
       'out loud.' + HELD);
     assert.deepStrictEqual(rSemi.tags, ['banned', 'semicolon'],
       'a report is read across runs, so the tag list is sorted and the semicolon fires');
+
+    // Format is an argument, not an assumption. The semicolon is the one rule
+    // scoped to short posts, so it is the only thing that can prove the flag
+    // reached `lexical` rather than only the reported string. Same file, same
+    // bytes, both ways round, because a format that changed only the label
+    // would pass an assert on the label alone.
+    const fmtDraft = writeFixture(path.join(root, 'repfmt'), 'draft.md',
+      'Acme shipped 41 units.\n\nI checked the numbers again on Monday morning; the gap ' +
+      'between what the forecast said and what the warehouse actually moved turned out to ' +
+      'be wider than anyone in that room wanted to admit out loud.' + HELD);
+    const fShort = gateReport(fmtDraft, null);
+    const fLong = gateReport(fmtDraft, null, 'long');
+    assert.strictEqual(fShort.format, 'short', 'an omitted format is short, which every caller relies on');
+    assert.deepStrictEqual(fShort.tags, ['semicolon'], 'and a semicolon in a short post is a catch');
+    assert.strictEqual(fShort.gate_passes, false, 'so the draft does not pass');
+    assert.strictEqual(fLong.format, 'long', 'the report names the format it was asked for');
+    assert.deepStrictEqual(fLong.tags, [], 'and the same semicolon in a long piece is not a catch');
+    assert.strictEqual(fLong.gate_catch_count, 0, 'nothing left to count');
+    assert.strictEqual(fLong.gate_passes, true, 'so the same bytes pass at the other format');
+    assert.strictEqual(gateReport(fmtDraft, null, 'novella').format, 'short',
+      'and an unknown format falls back to the stricter scope rather than retiring a rule');
 
     const rOver = rep('Acme shipped 41 units.\n\nI checked the robust numbers again on ' +
       'Monday morning, and the seamless gap between what the forecast said and what the ' +
@@ -1923,6 +2027,55 @@ function selfTest() {
     assert.ok(rl.words > 200, 'fixture is past the first bucket');
     assert.strictEqual(rl.rewrite_cap, 6, 'so the cap is two buckets, not one');
     assert.strictEqual(rl.model_owned.length, 7, 'and the judged tells are named, not implied clean');
+
+    // ---------------------------------------------- gate --report: lock 5
+    //
+    // Section 3's only hard fail, and until this call site existed it had
+    // none: step 2 defers it for want of a draft and step 6 is visual only, so
+    // a short post cleared lock 5 by never being checked against it. All three
+    // states are pinned, because the dangerous one is the third.
+    const lock5 = path.join(root, 'profiles', 'lock5');
+    const LOCKRUN = 'the shadow spreadsheet is where the real planning happens every single week here';
+    writeFixture(lock5, 'runs/2026-03-02-prior/shipped.md',
+      'Nobody wrote any of it down at the time.\n\n' + LOCKRUN + '.\n');
+    writeFixture(lock5, 'inventory.md',
+      '## Items\n\n- id: unrelated\n  content: A different sentence about pallets.\n' +
+      '  clearance: public\n');
+    const lock5Draft = writeFixture(path.join(root, 'replock5'), 'draft.md',
+      'Acme shipped 41 units in March 2026.\n\n' + LOCKRUN + '.\n\n' + REPBODY + HELD);
+
+    const rOv = gateReport(lock5Draft, lock5);
+    assert.strictEqual(rOv.overlap.ran, true, 'a profile is a corpus, so lock 5 runs');
+    assert.strictEqual(rOv.overlap.failures.length, 1, 'a run repeated from a shipped prior is one span');
+    assert.strictEqual(rOv.overlap.failures[0].prior, '2026-03-02-prior', 'named by the prior it came from');
+    assert.strictEqual(rOv.overlap.pass, false, 'so lock 5 fails');
+    assert.strictEqual(rOv.gate_passes, false, 'and section 3 calls that a hard fail of the gate');
+    assert.strictEqual(rOv.action, 'redraft',
+      'repeating yourself verbatim is fixed at the brief, so it is a redraft and not a rewrite');
+    assert.strictEqual(rOv.overlap_priors_compared, 1, 'against a corpus whose size is on the surface');
+    assert.deepStrictEqual(rOv.tags, [], 'lock 5 is not a tell, so it does not enter the tag list');
+    assert.strictEqual(rOv.gate_catch_count, 0,
+      'nor the tell count, which is why the overlap block is read and not inferred from these');
+
+    // The same span, now traceable to an inventory item. Section 13.1 cites it
+    // instead of failing it, and a citation that failed the gate is how the
+    // person ends up turning the check off.
+    writeFixture(lock5, 'inventory.md',
+      '## Items\n\n- id: shadow-spreadsheet\n  content: ' + LOCKRUN + '.\n  clearance: public\n');
+    const rOvWarn = gateReport(lock5Draft, lock5);
+    assert.strictEqual(rOvWarn.overlap.failures.length, 0, 'nothing left to fail');
+    assert.strictEqual(rOvWarn.overlap.warnings.length, 1, 'the span is still cited');
+    assert.strictEqual(rOvWarn.overlap.pass, true, 'and lock 5 clears');
+    assert.strictEqual(rOvWarn.gate_passes, true, 'so a warning does not fail the gate');
+    assert.strictEqual(rOvWarn.action, 'none', 'and sends the run nowhere');
+
+    // No profile, no corpus. This must not read as a clean lock 5, which is
+    // the same failure shape as "fires: 0" over an empty negative control.
+    assert.strictEqual(rClean.overlap.ran, false, 'without a profile there is nothing to compare against');
+    assert.ok(!('pass' in rClean.overlap), 'so the block carries no verdict at all');
+    assert.ok(/did not run/.test(rClean.overlap.reason), 'and says so in words a report can quote');
+    assert.strictEqual(rClean.overlap_priors_compared, null,
+      'null is not zero here: zero priors is a comparison, null is the absence of one');
 
     // ------------------------------------- the false-positive half of step 4
     //
@@ -2090,7 +2243,10 @@ function main(argv) {
       return locks(need(args[0], 'profile directory'));
     case 'gate': {
       const here = f => path.join(__dirname, f);
-      if (rest.includes('--report')) return gateReport(need(args[0], 'draft'), args[1] || null);
+      if (rest.includes('--report')) {
+        return gateReport(need(args[0], 'draft'), args[1] || null,
+          rest.includes('--long') ? 'long' : 'short');
+      }
       if (rest.includes('--tells')) return gateTells(args[0] || here('ai-tells.md'));
       if (rest.includes('--hooks')) return gateHooks(args[0] || here('hooks.md'));
       if (rest.includes('--negative')) return gateNegative(need(args[0], 'profile directory'));

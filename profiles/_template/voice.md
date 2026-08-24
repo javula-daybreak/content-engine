@@ -34,6 +34,11 @@ measured_from: <what was pasted, e.g. 3 slack messages + 1 email>
     <verbatim, unedited, line breaks and typos kept>
 ```
 
+**Paste below the fence, never inside it.** The block above is the schema, and
+the engine strips fenced blocks before reading samples, so anything typed into
+it is discarded without a word. Filling in the fence looks right and leaves you
+with an empty corpus.
+
 Same shape as `shipped-history.md` on purpose. `engine.js gate --negative`
 reads these to measure how often the language gate fires on this person's own
 writing, and zero is the pass bar, so a sample edited on the way in makes that
