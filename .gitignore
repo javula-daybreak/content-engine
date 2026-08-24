@@ -1,3 +1,2 @@
 profiles/*
 !profiles/_template/
-node_modules/

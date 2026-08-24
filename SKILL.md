@@ -63,6 +63,20 @@ A format workflow that reimplements one of them is a bug.
 | 7. Render | workflow | no | yes |
 | 8. Log run, ship keystroke | router | yes | yes |
 
+**On a visual run, `draft.md` is the render spec.** Added 2026-08-20, when both
+renderers were vendored and this was true in two workflow files and stated in
+none. Step 4 writes the Markdown spec `render.py` consumes, so step 5's gate
+reads every word that reaches the canvas and no separate copy of the on-slide
+text exists to drift from it. Two consequences: the renderers judge layout only
+and never language, and the generated HTML is a build artifact nobody hand-edits,
+because an edit there ships an image the gate never saw.
+
+**Step 6 writes `runs/<slug>/design-gate.md`** and step 7 does not run before it
+exists, which mirrors step 5's own existence check. The gate reads the generated
+HTML as text rather than a screenshot, per PRD §4's cost argument; the rules are
+PRD §10.3 and `VISUALS.md` §5, and `reference/design-tells.md` is named by PRD
+§1.2 and §3 but is not built.
+
 ### Step 1: load
 
 Load exactly this, and nothing else:
@@ -116,15 +130,32 @@ quote its JSON. Do not judge these by reading.
 3. **Hook pattern alone.** No reuse within the trailing 8, and no more than
    twice in any trailing 20.
 4. **Archetype.** No reuse within the trailing 5 shipped visual pieces. Visual
-   runs only.
+   runs only. Two readings were undefined until 2026-08-20 and both are the
+   router's to apply, so they are settled here.
+   **Carousels count, and a deck's `archetype:` names its spine**, the interior
+   archetype carrying the argument. `cover` and `cta` are furniture, appear in
+   every deck, and consume nothing. `VISUALS.md` §2.1 exempts carousels
+   *"because they carry no `archetype:`"*, and that premise is void: PRD §5's
+   front matter carries `archetype:` on every visual run and
+   `workflows/carousel.md` writes one. A lock whose stated reason has been
+   overtaken is not a lock, so the exemption goes and the spine reading stands.
+   **The depth-scaled form is the operative one**, per `VISUALS.md` §2.1: no
+   archetype twice in a row, and no more than twice in any trailing 5, with the
+   second clause suspended while fewer than 6 archetypes are built. The flat
+   trailing-5 above deadlocks on the fifth run when only four forms exist, which
+   is today's infographic coverage, and refuses for a reason nobody can act on.
 5. **Verbatim overlap.** Checked at step 5, not here, because it needs a draft.
+   `gate --report` is what runs it, and the verdict is in that JSON.
 
 Every run also logs a **structural job**: `argue`, `enumerate`, `sequence`,
 `compare`, `transform`, `diagnose`, `quantify`. Reusing an anchor across formats
 is allowed. Reusing the job is not. A repurpose matching its source on anchor
 **and** job **and** thesis is refused at the brief, before any draft tokens are
 spent, and the refusal returns three alternate angles read off live inventory
-state rather than a bare no.
+state rather than a bare no. **An article and its mandatory carousel derivative
+are not a repurpose.** They are one run, one brief and one anchor lock, planned
+as two surfaces before either was drafted, so the rule above never reads them as
+a second piece. See `workflows/article.md`.
 
 When the inventory is too thin to clear the locks, say so and print the runway
 number. Do not draft off a locked anchor.
@@ -144,6 +175,7 @@ crash at render:
 ```
 anchor:
 supports: []
+format: short | carousel | infographic | article
 job:
 hook_id:
 thesis_id:
@@ -154,6 +186,13 @@ signal_id:
 private_terms: []
 status: drafted
 ```
+
+`format:` is written here and it is what the article cap in
+`workflows/article.md` counts. `archetype:` is the one field this step leaves
+empty on a visual run: the router writes the key, the format workflow writes the
+value at **step 4a**, before drafting, because selecting a form is a read of the
+material's shape per `VISUALS.md` §2.3 and only the workflow does that read. Lock
+4 is checked against it in the same turn it is written.
 
 `private_terms:` holds every proper noun, numeral, and distinctive phrase whose
 only source is a `visibility: private` signal.
@@ -195,6 +234,16 @@ a role-plus-employer-plus-timeframe triple, or a figure whose source item is not
 `clearance: public` is rejected and redrafted. So is a draft containing any
 literal string in `private_terms:`. Rewriting a disclosure only produces a
 better-written disclosure.
+
+**Lock 5 closes here.** `gate --report` runs the verbatim overlap check, because
+step 2 had no draft to hold against the shipped corpus. A span of eight or more
+words repeated from a prior piece is PRD section 3's only hard fail: go back to
+`brief.md` and redraft, and never patch the span, because a reworded repetition
+is still the repetition. A span traceable to an inventory item or to `thesis.md`
+is cited in the report as a warning and left alone, since a check that rewrites
+the one story a person legitimately retells is a check they turn off. Called
+without a profile the block reports `ran: false` and no verdict, which is not a
+pass.
 
 The deterministic half is `reference/engine.js`: 8-gram overlap, the lexical
 list, contraction rate, sentence-length stdev, comma density, specifics count,
@@ -239,6 +288,11 @@ against. **Do not recompute any of them by reading.** A count derived by adding
 two JSON arrays together is the self-witnessed number this whole split exists to
 prevent.
 
+The profile argument is not optional in practice: without it the `overlap` block
+reports `ran: false` and lock 5 goes unchecked. Format defaults to short. Pass
+`--long` on an article, which is what takes the semicolon rule back out of
+scope, and the report echoes the format it was asked for.
+
 Then four headings, any of which may be empty:
 
 - **`rewritten`**, one line per change: the tag, the span before, the span after.
@@ -247,18 +301,27 @@ Then four headings, any of which may be empty:
   naming the habit it lost to.
 - **`unresolved`**, what bound 3 could not clear after the redraft.
 
-**The run prints one line, not the file**, directly above the post, and only when
-the gate caught something:
+**The run prints one line, not the file**, directly above the post. It prints
+whenever `gate_passes` is false, or anything was caught, or anything was flagged:
 
 ```
 gate: <n> caught, <n> rewritten, <n> flagged
 ```
 
-with ` · unresolved: <tags>` appended when bound 3 ran out. A run that caught
-nothing prints no gate line at all, the same way the staleness line and the
-sibling notice already work, and `gate_passes: true` is still written to the
-file. A flag changes no word, so it does not fail the gate, but it is counted on
-that line rather than swallowed by the pass.
+with ` · unresolved: <tags>` appended when bound 3 ran out, and
+` · lock 5: <n> verbatim from <prior slug>` appended when the `overlap` block
+failed. A run that passed clean and flagged nothing prints no gate line at all,
+the same way the staleness line and the sibling notice already work, and
+`gate_passes: true` is still written to the file. A flag changes no word, so it
+does not fail the gate, but it is counted on that line rather than swallowed by
+the pass.
+
+**Read the trigger off `gate_passes`, never off `gate_catch_count`.**
+`gate_catch_count` and `tags` are defined over the tell table, lock 5 is a lock
+and has no tell id, so a draft whose only failure is verbatim overlap reports
+`gate_catch_count: 0` while `gate_passes` is false. Keying the line off the count
+prints nothing on the one hard fail in §3, which is the exact shape of silence
+this split exists to prevent.
 
 **Never show the post before `gate-report.md` exists in the run directory.**
 That is the mechanical version of "the gate is not advisory": one existence
@@ -287,7 +350,11 @@ interview is where people quit.
 End every run with `Shipped as written? [y/n]`.
 
 `y` copies `draft.md` to `runs/<slug>/shipped.md`, flips `brief.md`'s `status:`
-to `shipped`, and appends the `posts.csv` row. `n` prompts for a paste, or
+to `shipped`, and appends the `posts.csv` row. **On a visual run `shipped.md` is
+still written and is still the diff corpus**, because it holds the words that
+were on the canvas and lock 5 reads it; the file a human uploads is `deck.pdf` or
+the PNG beside it. Ship names that file in its confirmation line and does not
+copy it anywhere. `n` prompts for a paste, or
 defers to the weekly review.
 
 **The posts.csv row.** The header is frozen in PRD section 11. Ship writes only
