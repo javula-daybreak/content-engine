@@ -1,0 +1,260 @@
+/* _base.css — STRUCTURE ONLY, and the only stylesheet in this directory.
+   Every colour, font, radius and rule weight is a custom property. They
+   come from one profile's theme.json, emitted as a :root block by
+   render.py's theme_css(). There is no per-brand CSS file: the dark-slide
+   treatment at the bottom of this file used to live in one, and it reads
+   only tokens now. */
+
+/* ---------- reset ---------- */
+*{margin:0;padding:0;box-sizing:border-box;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+
+/* Display type. --font-head is theme.json's font_head, --font its
+   font_body; the display atoms are the only places the two differ. */
+.h1,.stat .num,.pull-q,.wm{font-family:var(--font-head);}
+
+html,body{
+  font-family:var(--font);
+  background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;
+}
+
+/* ---------- page + aspect/density hooks ---------- */
+@page{size:1080px 1350px;margin:0;}      /* size patched per-render in render.py */
+
+.deck.a-4x5 .slide{width:1080px;height:1350px;}
+.deck.a-1x1 .slide{width:1080px;height:1080px;}
+
+.deck.d-spartan .h1{font-size:92px;}
+.deck.d-spartan .lead{font-size:36px;}
+
+.slide{
+  width:1080px;height:1350px;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;
+  padding:96px 84px 72px;
+  page-break-after:always;break-after:page;
+  background:var(--bg);
+}
+.slide:last-child{page-break-after:auto;break-after:auto;}
+
+/* ---------- shared atoms ---------- */
+.top{display:flex;align-items:center;justify-content:space-between;}
+.eyebrow{
+  font-weight:700;font-size:21px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--accent-deep);
+}
+.kicker{
+  display:inline-flex;align-items:center;gap:12px;
+  font-weight:700;font-size:21px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--accent-deep);
+}
+.kicker::before{content:"";width:34px;height:var(--rule-weight);border-radius:2px;background:var(--accent);}
+
+.body{flex:1;display:flex;flex-direction:column;justify-content:center;}
+
+.h1{font-weight:800;font-size:82px;line-height:1.05;letter-spacing:-.025em;color:var(--ink);}
+.h1 .g{color:var(--accent-deep);}
+.h1.big{font-size:96px;}
+.h1.sm{font-size:70px;}
+.h1.xs{font-size:62px;}
+
+.rule{width:104px;height:var(--rule-weight);border-radius:4px;background:var(--accent);margin:34px 0 0;}
+
+.lead{font-weight:500;font-size:33px;line-height:1.5;color:var(--ink-soft);max-width:880px;}
+
+/* grid of four */
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:40px 56px;}
+.quad .k{font-weight:700;font-size:27px;color:var(--accent-deep);margin-bottom:8px;}
+.quad .s{font-weight:500;font-size:26px;line-height:1.42;color:var(--ink-soft);}
+
+/* stacked rows */
+.rows{display:flex;flex-direction:column;gap:34px;}
+.row{display:grid;grid-template-columns:330px 1fr;gap:28px;align-items:baseline;
+  padding-bottom:30px;border-bottom:var(--rule-weight) solid var(--line);}
+.row:last-child{border-bottom:none;padding-bottom:0;}
+.row .k{font-weight:700;font-size:30px;color:var(--ink);}
+.row .s{font-weight:500;font-size:27px;line-height:1.42;color:var(--ink-soft);}
+
+/* bullets */
+.bul{display:flex;flex-direction:column;gap:30px;}
+.bul li{list-style:none;position:relative;padding-left:40px;
+  font-weight:500;font-size:33px;line-height:1.4;color:var(--ink);}
+.bul li::before{content:"";position:absolute;left:0;top:15px;width:16px;height:16px;
+  border-radius:50%;background:var(--accent);}
+.bul li b{font-weight:700;color:var(--accent-deep);}
+
+/* quote card */
+.quote{background:var(--hero-bg);color:var(--on-dark);border-radius:var(--radius);padding:48px 52px;
+  font-weight:600;font-size:34px;line-height:1.42;}
+.quote .q{color:var(--accent-light);}
+
+/* compare cards */
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:32px;}
+.card{border-radius:var(--radius);padding:46px 44px;}
+.card h3{font-weight:700;font-size:20px;letter-spacing:.13em;text-transform:uppercase;margin-bottom:30px;}
+.card ul{display:flex;flex-direction:column;gap:22px;}
+.card li{list-style:none;font-weight:600;font-size:28px;line-height:1.3;}
+.card--flaw{background:var(--surface-2);}
+.card--flaw h3{color:var(--muted);}
+.card--flaw li{color:var(--ink-soft);}
+.card--win{background:var(--accent);}
+.card--win h3{color:var(--on-accent-soft);}
+.card--win li{color:var(--on-accent);}
+
+/* before/after */
+.ba{display:grid;grid-template-columns:1fr 1fr;gap:36px;}
+.ba .col h3{font-weight:700;font-size:20px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:24px;}
+.ba .col.after h3{color:var(--accent-deep);}
+.ba .col p{font-weight:600;font-size:31px;line-height:1.4;color:var(--ink);}
+.ba .col.after p{color:var(--accent-deep);}
+.ba .col.after p b{color:var(--accent-deep);}
+
+/* steps */
+.steps{display:flex;flex-direction:column;gap:30px;}
+.step{display:grid;grid-template-columns:74px 1fr;gap:28px;align-items:center;}
+.step .n{width:60px;height:60px;border-radius:50%;background:var(--accent);color:var(--on-accent);
+  font-weight:800;font-size:28px;display:flex;align-items:center;justify-content:center;}
+.step .k{font-weight:700;font-size:32px;color:var(--ink);line-height:1.1;}
+.step .s{font-weight:500;font-size:25px;color:var(--muted);margin-top:4px;}
+
+/* stat — one giant centered number + caption (+ optional sub) */
+.stat-body{align-items:center;text-align:center;}
+.stat{display:flex;flex-direction:column;align-items:center;gap:22px;max-width:880px;}
+.stat .num{font-weight:800;font-size:300px;line-height:.92;letter-spacing:-.04em;
+  color:var(--accent-deep);}
+.stat .num .g{color:var(--accent);}
+.stat .cap{font-weight:600;font-size:40px;line-height:1.32;color:var(--ink-soft);}
+.stat .sub{font-weight:500;font-size:28px;line-height:1.4;color:var(--muted);margin-top:6px;}
+
+/* accent strip / pull quote */
+.strip{border-left:var(--rule-weight) solid var(--accent);padding:6px 0 6px 30px;
+  font-weight:600;font-size:31px;line-height:1.4;color:var(--ink);}
+.strip.dark{border:none;background:var(--hero-bg);color:var(--on-dark);border-radius:var(--radius);
+  padding:38px 44px;font-size:32px;}
+.micro{font-weight:600;font-size:27px;color:var(--accent-deep);}
+
+/* quote-spotlight: one oversized pull quote, vertically centered, with a
+   thick accent bar to the left + a big accent quotation glyph. */
+.quote-body{justify-content:center;}
+.pull{border-left:var(--rule-weight) solid var(--accent);padding-left:48px;max-width:920px;}
+.pull-mark{font-weight:800;font-size:140px;line-height:.6;color:var(--accent);
+  margin-bottom:8px;}
+.pull-q{font-weight:800;font-size:70px;line-height:1.15;letter-spacing:-.02em;
+  color:var(--ink);}
+.pull-q .g{color:var(--accent-deep);}
+.attr{font-weight:700;font-size:30px;letter-spacing:.01em;color:var(--accent-deep);}
+
+/* image-bg: full-bleed embedded image as the slide background, under a
+   tokenized scrim gradient for text legibility. The image url is set inline
+   (render.py) on .slide.imgbg; .scrim-fill paints the gradient over it. The
+   scrim VARIANT class (scrim-dark|scrim-light|scrim-none) selects the gradient
+   token AND the text color so headline/body read over the photo. Footer +
+   counter + progress stay above the scrim via the slide's stacking context. */
+.slide.imgbg{background-size:cover;background-position:center;}
+.slide.imgbg .scrim-fill{position:absolute;inset:0;z-index:0;}
+.slide.imgbg .top,.slide.imgbg .body,.slide.imgbg .foot,.slide.imgbg .bar{
+  position:relative;z-index:1;}
+.slide.imgbg.scrim-dark .scrim-fill{background:var(--scrim-dark);}
+.slide.imgbg.scrim-light .scrim-fill{background:var(--scrim-light);}
+.slide.imgbg.scrim-none .scrim-fill{background:none;}
+.img-body{justify-content:flex-end;}
+/* dark scrim => white text; light scrim => ink text. Tokenized, no hex. */
+.slide.imgbg.scrim-dark .h1,.slide.imgbg.scrim-dark .lead,
+.slide.imgbg.scrim-dark .kicker,.slide.imgbg.scrim-dark .wm,
+.slide.imgbg.scrim-dark .idx{color:var(--on-dark);}
+.slide.imgbg.scrim-dark .kicker::before{background:var(--accent);}
+.slide.imgbg.scrim-dark .h1 .g{color:var(--accent-light);}
+.slide.imgbg.scrim-light .h1,.slide.imgbg.scrim-light .lead,
+.slide.imgbg.scrim-light .kicker,.slide.imgbg.scrim-light .wm,
+.slide.imgbg.scrim-light .idx{color:var(--ink);}
+.slide.imgbg.scrim-light .h1 .g{color:var(--accent-deep);}
+
+/* index: auto-numbered agenda. Two-digit accent number + section title.
+   Wraps to two balanced columns when the .cols-2 class is present. */
+.index{display:flex;flex-direction:column;gap:30px;list-style:none;}
+.index.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:30px 64px;}
+.ix{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:baseline;
+  padding-bottom:26px;border-bottom:var(--rule-weight) solid var(--line);}
+.index.cols-2 .ix:nth-last-child(-n+2){border-bottom:none;padding-bottom:0;}
+.index:not(.cols-2) .ix:last-child{border-bottom:none;padding-bottom:0;}
+.ix-n{font-weight:800;font-size:34px;color:var(--accent);letter-spacing:-.02em;
+  font-variant-numeric:tabular-nums;}
+.ix-t{font-weight:700;font-size:36px;line-height:1.15;color:var(--ink);}
+.ix-t .g{color:var(--accent-deep);}
+
+/* logo-wall: a responsive grid of bordered/tinted label cells. 2 or 3
+   columns by count (render.py sets .cols-2 / .cols-3). Text labels only. */
+.logo-wall{display:grid;gap:28px;}
+.logo-wall.cols-2{grid-template-columns:1fr 1fr;}
+.logo-wall.cols-3{grid-template-columns:1fr 1fr 1fr;}
+.logo-cell{display:flex;align-items:center;justify-content:center;text-align:center;
+  min-height:150px;padding:30px 28px;border-radius:var(--radius);
+  background:var(--surface-2);border:var(--rule-weight) solid var(--line);
+  font-weight:700;font-size:30px;line-height:1.2;color:var(--ink);}
+.logo-cell .g{color:var(--accent-deep);}
+
+.gap-l{margin-top:64px;}
+.gap-m{margin-top:48px;}
+.gap-s{margin-top:32px;}
+
+/* ---------- footer + wayfinding ---------- */
+.foot{display:flex;align-items:center;justify-content:space-between;margin-top:auto;}
+.wm{display:flex;align-items:center;gap:14px;font-weight:700;font-size:30px;
+  letter-spacing:-.01em;color:var(--ink);}
+.mark{width:38px;height:38px;border-radius:50%;flex:0 0 auto;
+  background:var(--mark) center/contain no-repeat;}
+.idx{font-weight:600;font-size:23px;letter-spacing:.04em;color:var(--muted);}
+.cue{font-weight:700;font-size:24px;letter-spacing:.02em;color:var(--accent);}
+
+.bar{display:flex;gap:7px;margin-top:26px;}
+.seg{flex:1;height:6px;border-radius:3px;background:var(--seg-off);}
+.bar .seg.on{background:var(--accent);}
+
+/* ---------- cta chip + note (structure; colors tokenized) ---------- */
+.cta{display:inline-flex;align-items:center;gap:14px;align-self:flex-start;
+  background:var(--accent);color:var(--on-accent-strong);font-weight:800;font-size:30px;
+  padding:22px 38px;border-radius:var(--radius);letter-spacing:-.01em;margin-top:8px;}
+.cta .ar{font-size:30px;}
+
+.note{font-weight:600;font-size:27px;color:var(--note);}
+
+/* ---------- dark slides (cover + cta, or any slide with bg: dark) ----------
+   This block used to live in each brand's own theme CSS. With theme.json as
+   the only theme input there is no such file, so it lives here and reads
+   only tokens: --hero-glow over --hero-bg for the field, then --on-dark,
+   --note and --accent-light for everything that has to survive on it. */
+.slide.dark{background:var(--hero-glow), var(--hero-bg);color:var(--on-dark);}
+.slide.dark .h1{color:var(--on-dark);}
+.slide.dark .h1 .g{color:var(--accent-light);}
+.slide.dark .eyebrow,.slide.dark .kicker{color:var(--accent-light);}
+.slide.dark .kicker::before{background:var(--accent-light);}
+.slide.dark .lead{color:var(--note);}
+.slide.dark .wm{color:var(--on-dark);}
+.slide.dark .idx{color:var(--note);}
+.slide.dark .cue{color:var(--accent-light);}
+.slide.dark .seg{background:var(--seg-off-dark);}
+/* the filled segment has to win against the line above it: same
+   specificity, and this file's dark block comes last. */
+.slide.dark .bar .seg.on{background:var(--accent-light);}
+.slide.dark .bul li{color:var(--on-dark);}
+.slide.dark .bul li::before{background:var(--accent-light);}
+.slide.dark .bul li b{color:var(--accent-light);}
+.slide.dark .note{color:var(--note);}
+.slide.dark .micro{color:var(--accent-light);}
+.slide.dark .stat .num{color:var(--accent-light);}
+.slide.dark .stat .num .g{color:var(--on-dark);}
+.slide.dark .stat .cap{color:var(--on-dark);}
+.slide.dark .stat .sub{color:var(--note);}
+.slide.dark .pull{border-left-color:var(--accent-light);}
+.slide.dark .pull-mark{color:var(--accent-light);}
+.slide.dark .pull-q{color:var(--on-dark);}
+.slide.dark .pull-q .g{color:var(--accent-light);}
+.slide.dark .attr{color:var(--accent-light);}
+.slide.dark .ix{border-bottom-color:var(--line-dark);}
+.slide.dark .ix-n{color:var(--accent-light);}
+.slide.dark .ix-t{color:var(--on-dark);}
+.slide.dark .ix-t .g{color:var(--accent-light);}
+.slide.dark .logo-cell{background:var(--surface-dark);
+  border-color:var(--line-dark);color:var(--on-dark);}
+.slide.dark .logo-cell .g{color:var(--accent-light);}
