@@ -49,7 +49,8 @@ body{font-family:var(--font-body);background:var(--bg);
   font-weight:800;font-size:30px;letter-spacing:-.01em;color:var(--ink);}
 .footbar .mark{width:42px;height:42px;flex:0 0 auto;
   background:var(--mark) center/contain no-repeat;}
-.footbar .fmeta{font-weight:600;font-size:22px;color:var(--muted);}
+.footbar .fmeta{margin-left:auto;font-weight:600;font-size:22px;
+  color:var(--muted);}
 
 /* ---------- accent atom (shared) ---------- */
 .g{color:var(--accent-deep);}
@@ -60,7 +61,11 @@ body{font-family:var(--font-body);background:var(--bg);
    stack. Nothing here sets a family name. */
 .h1,.footbar .wm,.ring .num,.ring .lab,.stepbody .t,.card .ct,.card .cnum,
 .chd,.crow .clab,.verdict .vlab,.iltitle,.ilnum,.funnel .flabel,
-.pb-snum,.pb-stitle,.dihub-t,.dicall-t{font-family:var(--font-head);}
+.pb-snum,.pb-stitle,.dihub-t,.dicall-t,
+.sp-label,.sp-whole .sp-txt,.cn-label,.cn-ord,.cn-cutlab,.tp-tick,.tp-val,
+.ds-reflab,.ds-n,.br-lab,.br-in,.br-num,.cs-pct,.wf-val,.wf-lab,.sh-q,.sh-pub,
+.an-term,.an-eq,.an-pill,.qm-qname,.qm-lab,.ic-lab,.ic-ord,.ic-count,
+.mr-eqlab{font-family:var(--font-head);}
 
 /* ---------- numbered-steps -------
    Absolutely positioned within a fixed-height .steps2: a background SVG
@@ -212,7 +217,10 @@ body{font-family:var(--font-body);background:var(--bg);
 .pb-snum{font-weight:800;font-size:64px;line-height:1;letter-spacing:-.03em;
   color:var(--accent-deep);}
 .pb-snum .g{color:var(--accent-deep);background:none;padding:0;}
-.pb-slab{font-weight:700;font-size:19px;line-height:1.2;color:var(--muted);
+/* --muted is a caption colour on the page ground; on the tinted stat band it
+   measured 2.91:1 at 19px, under VISUALS 6.3's 3:1 for large text. Found by
+   check_layout on 2026-08-24, which is the first thing that could see it. */
+.pb-slab{font-weight:700;font-size:19px;line-height:1.2;color:var(--ink-soft);
   margin-top:10px;max-width:230px;}
 .pb-grid{display:grid;gap:calc(18px * var(--space));flex:1 1 auto;min-height:0;align-content:stretch;}
 .pb-cols-2{grid-template-columns:1fr 1fr;}
@@ -257,3 +265,311 @@ body{font-family:var(--font-body);background:var(--bg);
 /* ---------- smoke (engine smoke test only) ---------- */
 .smoke{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;
   font-weight:600;font-size:38px;color:var(--muted);}
+
+/* =========================================================================
+   The VISUALS section 3 signatures, added 2026-08-24. One block per template,
+   unique class prefix, and the same two rules as every block above it: no value
+   here is a brand value, and every gap, radius and rule derives from
+   theme.json's --space, --radius and --rule so a dense theme, a square theme and
+   a hairline theme all still look like one product.
+
+   Two conventions the layout checks depend on:
+     data-layer="claim"  the atoms VISUALS section 1 needs to survive 220px.
+     data-ramp="<name>"  a generated luminance ramp, which is what the tint
+                         check re-mixes in OKLab against the page ground.
+
+   And one rule that is not cosmetic: `color` is never redeclared on a child
+   class that also appears inside a filled parent. Reversed text inherits from
+   the fill's own element instead, so the contrast check reads the same pair the
+   browser paints. A `.parent .child{color:...}` override would make the two
+   disagree, and the check would be measuring a colour nobody sees.
+   ========================================================================= */
+
+/* ---------- 3.5 perception split -> split panel ----------
+   Two panels, same object, same width, drawn at the same scale. One slot above,
+   five below: the asymmetry is the content. Leader lines start inside a slot and
+   cross its edge, and the divider bleeds to both canvas edges. */
+.splitpanel{display:flex;flex-direction:column;width:100%;flex:1 1 auto;
+  min-height:0;justify-content:center;}
+.sp-panel{display:flex;flex-direction:column;gap:calc(13px * var(--space));}
+.sp-top{flex:0 0 auto;}
+.sp-bottom{flex:1 1 auto;min-height:0;}
+.sp-bottom .sp-object{flex:1 1 auto;}
+.sp-bottom .sp-slot{flex:1 1 0;}
+.sp-label{font-weight:800;font-size:36px;line-height:1.05;color:var(--ink);
+  letter-spacing:-.01em;}
+.sp-label .g{color:var(--accent-deep);background:none;padding:0;}
+.sp-object{border:calc(var(--rule) * 3) solid var(--ink);
+  border-radius:var(--radius);display:flex;flex-direction:column;color:var(--ink);}
+.sp-slot{position:relative;padding:14px 24px 14px 52px;min-height:62px;
+  display:flex;align-items:center;
+  border-top:calc(var(--rule) * 2) solid var(--line);}
+.sp-slot:first-child{border-top:none;}
+.sp-whole{min-height:136px;background:var(--accent-wash);}
+.sp-txt{font-weight:600;font-size:24px;line-height:1.22;}
+.sp-whole .sp-txt{font-weight:800;font-size:33px;line-height:1.1;}
+.sp-lead{position:absolute;left:-13px;top:50%;width:54px;
+  height:calc(var(--rule) * 3);background:var(--accent);
+  transform:translateY(-50%);}
+.sp-lead::before{content:"";position:absolute;left:-9px;top:50%;width:13px;
+  height:13px;border-radius:50%;background:var(--accent);
+  transform:translateY(-50%);}
+.sp-break{background:var(--surface-2);}
+.sp-break .sp-txt{font-style:italic;font-weight:700;}
+.sp-callout{align-self:flex-end;max-width:360px;text-align:right;
+  font-style:italic;font-weight:600;font-size:20px;line-height:1.24;
+  color:var(--muted);}
+.sp-div{margin:calc(20px * var(--space)) calc(-76px * var(--space));
+  height:calc(var(--rule) * 5);background:var(--ink);}
+
+/* ---------- 3.16 causal chain -> chain ----------
+   One unbroken thread. An arrow asserts necessity, so every link is a rule plus
+   an arrowhead and never a dotted hop; `break_after` draws the one link the
+   author says can be cut, which is the post's argument in the geometry. The
+   terminal cost is an accent-wash panel with a heavy accent edge rather than
+   reversed type: the payoff reads as the payoff without a contrast hazard. */
+.chain{display:flex;flex-direction:column;width:100%;flex:1 1 auto;min-height:0;
+  justify-content:center;}
+.cn-node{display:flex;align-items:center;gap:calc(18px * var(--space));
+  background:var(--surface);border:calc(var(--rule) * 2) solid var(--line);
+  border-radius:var(--radius);padding:16px 22px;color:var(--ink);}
+.cn-ord{flex:0 0 auto;width:46px;height:46px;border-radius:var(--radius);
+  background:var(--surface-2);font-weight:800;font-size:24px;
+  display:flex;align-items:center;justify-content:center;}
+.cn-body{min-width:0;}
+.cn-label{font-weight:800;font-size:31px;line-height:1.05;letter-spacing:-.01em;}
+.cn-label .g{color:var(--accent-deep);background:none;padding:0;}
+.cn-gloss{font-weight:500;font-size:19px;line-height:1.3;margin-top:3px;
+  opacity:.82;}
+.cn-cost{background:var(--accent-wash);border-color:var(--accent);
+  border-left-width:calc(var(--rule) * 10);}
+.cn-cost .cn-ord{background:var(--accent);color:var(--on-accent);}
+.cn-link{position:relative;flex:1 1 auto;min-height:52px;margin-left:44px;
+  width:calc(var(--rule) * 4);background:var(--accent);}
+.cn-link::after{content:"";position:absolute;left:50%;bottom:-1px;width:24px;
+  height:15px;background:var(--accent);transform:translateX(-50%);
+  clip-path:polygon(50% 100%, 0 0, 100% 0);}
+.cn-cut{position:absolute;left:-30px;top:50%;width:78px;
+  height:calc(var(--rule) * 4);background:var(--ink);
+  transform:translateY(-50%);}
+.cn-cutlab{position:absolute;left:66px;top:50%;transform:translateY(-50%);
+  font-weight:800;font-size:20px;color:var(--ink);white-space:nowrap;}
+
+/* ---------- 3.1 trend poster -> plot canvas ----------
+   Zero baseline, an axis maximum pinned just above the top datum rather than
+   rounded up, one value on the terminal point and nowhere else, no area fill and
+   no legend. Tick labels are a primary tier and are set larger than the subtitle
+   that explains them, which is VISUALS section 5.3's one inversion. */
+.plot{position:relative;width:100%;flex:0 0 auto;}
+.tp-svg{position:absolute;left:0;top:0;}
+.tp-grid{stroke:var(--line);stroke-width:calc(var(--rule) * 1.5);}
+.tp-line{fill:none;stroke:var(--accent);stroke-width:calc(var(--rule) * 5);
+  stroke-linejoin:round;stroke-linecap:round;}
+.tp-dot{fill:var(--accent);}
+.tp-term{fill:var(--accent);stroke:var(--bg);stroke-width:calc(var(--rule) * 4);}
+.tp-tick{position:absolute;left:0;width:110px;text-align:right;
+  transform:translateY(-50%);font-weight:800;font-size:30px;color:var(--ink);}
+.tp-xlab{position:absolute;bottom:0;transform:translateX(-50%);font-weight:600;
+  font-size:22px;color:var(--muted);}
+.tp-val{position:absolute;transform:translate(-96%,-150%);font-weight:800;
+  font-size:36px;color:var(--accent-deep);}
+.tp-units{position:absolute;right:0;top:-42px;font-weight:600;font-size:20px;
+  color:var(--muted);}
+
+/* ---------- 3.13 distribution strip -> plot canvas ----------
+   One axis, one dot per observation with deterministic five-lane jitter so a
+   cluster reads as density, a labelled rule at the value everyone assumes, and
+   the two extremes annotated. `anonymize` drops the annotations too, per 2.5. */
+.strip{display:flex;flex-direction:column;gap:calc(14px * var(--space));
+  width:100%;}
+.ds-n{font-weight:800;font-size:24px;color:var(--muted);}
+.ds-field{position:relative;height:520px;}
+.ds-line{position:absolute;left:0;right:0;top:50%;
+  height:calc(var(--rule) * 2);background:var(--line);}
+.ds-dot{position:absolute;width:26px;height:26px;border-radius:50%;
+  background:color-mix(in oklab, var(--accent) 70%, var(--bg));
+  transform:translate(-50%,-50%);}
+.ds-ref{position:absolute;top:0;bottom:0;width:calc(var(--rule) * 4);
+  background:var(--ink);transform:translateX(-50%);}
+.ds-reflab{position:absolute;top:-8px;transform:translate(-50%,-100%);
+  font-weight:800;font-size:26px;color:var(--ink);white-space:nowrap;}
+.ds-note{position:absolute;bottom:14px;font-weight:700;font-size:22px;
+  color:var(--muted);white-space:nowrap;}
+.ds-lo{transform:none;}
+.ds-hi{transform:translateX(-100%);}
+.ds-axis{position:relative;height:32px;}
+.ds-ax{position:absolute;transform:translateX(-50%);font-weight:600;
+  font-size:22px;color:var(--muted);}
+.ds-axis .ds-ax:first-child{transform:none;}
+.ds-axis .ds-ax:last-child{transform:translateX(-100%);}
+
+/* ---------- 3.2 ranked bar list -> bar rows ----------
+   No axis, no gridlines, no tick labels, no legend. On the ragged track the
+   value sits inside the right end of the bar, because an outside gutter shortens
+   every bar and flattens the gaps that are the whole point. The fixed track
+   squares its caps and prints an authoritative numeral column instead. */
+.bars{display:flex;flex-direction:column;gap:calc(15px * var(--space));
+  width:100%;flex:1 1 auto;min-height:0;justify-content:center;}
+.br-row{display:flex;align-items:center;gap:calc(16px * var(--space));}
+.br-lab{flex:0 0 262px;text-align:right;font-weight:800;font-size:25px;
+  line-height:1.06;color:var(--ink);}
+.br-bar{height:72px;border-radius:var(--radius);display:flex;align-items:center;
+  justify-content:flex-end;padding-right:15px;min-width:82px;color:var(--ink);}
+.br-in{font-weight:800;font-size:26px;}
+.br-track{flex:1 1 auto;height:52px;background:var(--surface);
+  border:calc(var(--rule) * 2) solid var(--line);overflow:hidden;}
+.br-fill{height:100%;border-radius:0;}
+.br-num{flex:0 0 132px;text-align:right;font-weight:800;font-size:28px;
+  color:var(--ink);}
+.br-rem{margin-top:6px;text-align:right;font-style:italic;font-weight:600;
+  font-size:20px;color:var(--muted);}
+
+/* ---------- 3.12 composition split -> bar rows, stacked ----------
+   One full-width stacked bar, square edges so no cap inflates a small share, and
+   the labels in a two-column list below rather than inside the segments. No pie
+   and no donut. `expectation` prints the belief the chart argues against. */
+.composition{display:flex;flex-direction:column;
+  gap:calc(24px * var(--space));width:100%;}
+.cs-exp{font-style:italic;font-weight:600;font-size:24px;line-height:1.28;
+  color:var(--muted);}
+.cs-bar{display:flex;width:100%;height:152px;overflow:hidden;
+  border-radius:var(--radius);
+  border:calc(var(--rule) * 2) solid var(--line);}
+.cs-seg{height:100%;}
+.cs-keys{display:grid;grid-template-columns:1fr 1fr;
+  gap:calc(15px * var(--space)) calc(32px * var(--space));}
+.cs-key{display:flex;align-items:baseline;gap:13px;}
+.cs-sw{flex:0 0 auto;width:26px;height:26px;border-radius:var(--radius);}
+.cs-pct{font-weight:800;font-size:33px;color:var(--ink);min-width:92px;}
+.cs-lab{font-weight:600;font-size:23px;line-height:1.18;color:var(--ink-soft);}
+
+/* ---------- 3.14 variance bridge -> waterfall ----------
+   Start and end grounded at zero, everything between floating, connector rules
+   at each step's foot, and the residual drawn as its own labelled bar. Sign is a
+   luminance step rather than a second hue: section 10 decision 2 is open. */
+.waterfall{display:flex;align-items:flex-end;gap:calc(10px * var(--space));
+  width:100%;}
+.wf-col{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:9px;}
+.wf-plot{position:relative;}   /* height is per render, set inline */
+.wf-bar{position:absolute;left:7%;right:7%;border-radius:var(--radius);}
+.wf-conn{position:absolute;left:-9%;right:-9%;height:calc(var(--rule) * 2);
+  background:var(--line);}
+.wf-val{position:absolute;left:0;right:0;text-align:center;font-weight:800;
+  font-size:20px;color:var(--ink);}
+.wf-lab{font-weight:700;font-size:18px;line-height:1.1;color:var(--ink);
+  text-align:center;padding-top:8px;min-height:78px;
+  border-top:calc(var(--rule) * 2) solid var(--line);}
+
+/* ---------- 3.8 sourced shelf -> tile grid, group bands ----------
+   Provenance sits where an icon would go: the publisher is the card's anchor and
+   is set at card-title size or larger. Grouping is one hue through three
+   luminances, bar over panel over card, rather than by drawing boxes. */
+.shelf{display:flex;flex-direction:column;gap:calc(14px * var(--space));
+  width:100%;flex:1 1 auto;min-height:0;}
+.sh-band{border-radius:var(--radius);padding:calc(13px * var(--space));
+  display:flex;flex-direction:column;gap:calc(11px * var(--space));
+  flex:1 1 0;min-height:0;color:var(--ink);}
+.sh-q{font-weight:800;font-size:27px;line-height:1.08;padding:9px 15px;
+  border-radius:var(--radius);}
+.sh-cards{display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:calc(11px * var(--space));flex:1 1 auto;min-height:0;}
+.sh-card{background:var(--bg);border:var(--rule) solid var(--line);
+  border-radius:var(--radius);padding:13px 15px;display:flex;
+  flex-direction:column;gap:6px;}
+.sh-pub{font-weight:800;font-size:23px;line-height:1.04;
+  color:var(--accent-deep);}
+.sh-title{font-weight:700;font-size:18px;line-height:1.18;}
+.sh-find{font-weight:500;font-size:16px;line-height:1.26;opacity:.84;}
+
+/* ---------- 3.6 analogy rows -> analogy rows ----------
+   Two columns and no illustration column, per section 3.6's illustration
+   problem: HTML cannot make a cross-hatched pencil drawing and a geometric icon
+   beside real drawing reads as clip art. Identical slot order in every row. */
+.analogy{display:flex;flex-direction:column;width:100%;flex:1 1 auto;
+  min-height:0;justify-content:center;}
+.an-row{flex:1 1 0;min-height:0;max-height:212px;display:flex;
+  align-items:center;
+  gap:calc(24px * var(--space));padding:calc(19px * var(--space)) 0;
+  border-bottom:var(--rule) solid var(--line);}
+.an-row:last-child{border-bottom:none;}
+.an-left{flex:0 0 424px;display:flex;align-items:center;gap:13px;}
+.an-term{font-weight:800;font-size:33px;line-height:1.04;color:var(--ink);
+  letter-spacing:-.02em;}
+.an-eq{font-weight:800;font-size:29px;color:var(--muted);}
+.an-pill{background:var(--accent-wash);border-radius:var(--radius);
+  padding:7px 15px;font-weight:800;font-size:25px;line-height:1.05;
+  color:var(--ink);}
+.an-facts{list-style:none;flex:1 1 auto;min-width:0;display:flex;
+  flex-direction:column;gap:7px;}
+.an-facts li{position:relative;padding-left:22px;font-weight:600;font-size:21px;
+  line-height:1.22;color:var(--ink-soft);}
+.an-facts li::before{content:"\25B8";position:absolute;left:0;top:2px;
+  color:var(--accent);font-size:14px;}
+
+/* ---------- 3.15 quadrant map -> quadrant ----------
+   Every item label dies at 220px, so the four quadrant names are the claim layer
+   and carry the whole payload. No rotated text anywhere: the vertical dimension
+   states its poles as two horizontal labels at the ends of its own axis. */
+.quadrant{position:relative;width:100%;flex:0 0 auto;}
+.qm-field{position:absolute;left:0;right:0;top:0;bottom:62px;
+  border:calc(var(--rule) * 2) solid var(--line);border-radius:var(--radius);}
+.qm-ax{position:absolute;background:var(--ink);}
+.qm-axv{left:50%;top:0;bottom:0;width:calc(var(--rule) * 3);
+  transform:translateX(-50%);}
+.qm-axh{top:50%;left:0;right:0;height:calc(var(--rule) * 3);
+  transform:translateY(-50%);}
+.qm-qname{position:absolute;max-width:42%;font-weight:800;font-size:29px;
+  line-height:1.05;color:var(--accent-deep);}
+.qm-q1{left:20px;top:16px;}
+.qm-q2{right:20px;top:16px;text-align:right;}
+.qm-q3{left:20px;bottom:16px;}
+.qm-q4{right:20px;bottom:16px;text-align:right;}
+.qm-item{position:absolute;display:flex;align-items:center;gap:10px;
+  transform:translate(-50%,50%);}
+.qm-l{flex-direction:row-reverse;}
+.qm-dot{flex:0 0 auto;width:22px;height:22px;border-radius:50%;
+  background:color-mix(in oklab, var(--accent) 62%, var(--bg));}
+.qm-lab{font-weight:700;font-size:21px;color:var(--ink);white-space:nowrap;}
+.qm-hi .qm-dot{width:31px;height:31px;}
+.qm-poles{position:absolute;left:0;right:0;bottom:20px;display:flex;
+  justify-content:space-between;}
+.qm-p{font-weight:700;font-size:22px;color:var(--muted);}
+.qm-ytop,.qm-ybot{position:absolute;left:50%;transform:translateX(-50%);
+  background:var(--bg);padding:0 12px;font-weight:700;font-size:22px;
+  color:var(--muted);white-space:nowrap;}
+.qm-ytop{top:-6px;}
+.qm-ybot{bottom:56px;}
+
+/* ---------- 3.10 stratified container + 3.11 mirrored rings -> banded cluster
+   Band width is computed from the item count and is never chosen: a shape that
+   changes width across strata with equal counts is wallpaper behind three plain
+   lists. One boundary is drawn heavier than the others. Chips over a tinted
+   field are translucent, not opaque, or the field's grouping signal dies. */
+.strata,.rings{display:flex;flex-direction:column;align-items:center;width:100%;
+  gap:calc(9px * var(--space));}
+.ic-band,.mr-band{border-radius:var(--radius);
+  padding:calc(13px * var(--space)) calc(19px * var(--space));
+  border-top:var(--rule) solid var(--line);color:var(--ink);}
+.ic-hard{border-top:calc(var(--rule) * 6) solid var(--ink);}
+.ic-head{display:flex;align-items:center;gap:13px;margin-bottom:9px;}
+.ic-ord{flex:0 0 auto;width:38px;height:38px;border-radius:var(--radius);
+  background:var(--bg);font-weight:800;font-size:22px;display:flex;
+  align-items:center;justify-content:center;}
+.ic-lab{font-weight:800;font-size:27px;line-height:1.04;letter-spacing:-.01em;}
+.ic-count{margin-left:auto;font-weight:800;font-size:24px;opacity:.7;}
+.ic-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.ic-chip{font-weight:600;font-size:18px;line-height:1.08;padding:6px 11px;
+  border-radius:var(--radius);
+  background:color-mix(in oklab, var(--bg) 50%, transparent);}
+.ic-notes{align-self:stretch;margin-top:calc(20px * var(--space));
+  border-left:calc(var(--rule) * 5) solid var(--accent);
+  padding-left:calc(18px * var(--space));display:flex;flex-direction:column;
+  gap:6px;}
+.ic-notes p{font-style:italic;font-weight:600;font-size:21px;line-height:1.26;
+  color:var(--muted);}
+.mr-half{display:flex;flex-direction:column;align-items:center;width:100%;
+  gap:calc(9px * var(--space));}
+.mr-eq{align-self:stretch;height:calc(var(--rule) * 6);background:var(--ink);
+  margin:calc(9px * var(--space)) calc(-76px * var(--space));}
+.mr-eqlab{align-self:stretch;font-weight:800;font-size:26px;color:var(--ink);}
+.mr-eqbad{text-align:right;}
