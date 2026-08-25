@@ -1,5 +1,6 @@
 ---
 title: The Canvas
+footer: Measured off render.py
 ---
 
 :: hybrid-playbook

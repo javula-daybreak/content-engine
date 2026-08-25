@@ -112,7 +112,12 @@ for any they have no answer to, confirm in the same turn, write it once;
 the template file itself. Rendering early decks off shipped defaults is the
 "looks like a template because it is one" failure that writer exists to prevent.
 
-The rules are already written. Read them, do not copy them.
+The rules are already written. Read them, do not copy them. **As of 2026-08-24
+they are consolidated in `reference/design-tells.md`**, one gate file with a
+citation on every entry, which is what PRD §1.2 and §3 have always named and what
+this table stood in for while it did not exist. Entries are tagged: this path
+reads `[carousel]` and `[both]`. The sources behind them, for anyone tracing an
+entry back:
 
 | Source | What it governs |
 | :- | :- |
@@ -122,8 +127,17 @@ The rules are already written. Read them, do not copy them.
 | VISUALS §5.5 | structure honesty: geometry claims what the material may not contain |
 | VISUALS §5.6 | a signature, not a follow-and-repost bar |
 
-VISUALS §6's thirty new entries are scoped to the infographic path by §6.1 and
-do not apply here until carousel evidence exists. Two of §6.3's checks are
+**Corrected 2026-08-24:** this read that *"VISUALS §6's thirty new entries are
+scoped to the infographic path by §6.1 and do not apply here until carousel
+evidence exists."* Too wide. §6's `[infographic]`-tagged entries are indeed
+scoped away, but the file also carries `[both]` entries drawn from §5 and PRD
+§10.3, and those have always applied here. Read the tag, not the section number.
+
+**The infographic renderer has a `check_layout` pass and this one does not.** It
+is stdlib and portable — sRGB/OKLab conversion and an `html.parser` walk carrying
+colour and size down the tree — so the contrast and thumbnail checks it mechanises
+are read by eye here until an equivalent exists. A deck shipping without them
+mechanically checked says so. Two of §6.3's checks are
 answered by the theme rather than by a per-run read: `theme_css()` derives
 on-accent text from the far end of the palette and the tints from the page
 background, so neither can be set globally wrong. What is left is the taste

@@ -1,9 +1,49 @@
 # Method — layout selection, copy budgets, density doctrine
 
 ## The one decision that matters: which layout?
-A single source can usually be told several ways. Pick the archetype whose
-*shape* matches the source's main idea, not the one that looks nicest. Read the
-piece, name its structure in one phrase, then map:
+
+**`content-engine-VISUALS.md` section 2 is the procedure and this file does not
+restate it.** Fifteen signatures, each stating what it requires and what
+disqualifies it; a disqualifier is fatal and no question clears it. What follows
+is the signature-to-archetype map, so a selected signature reaches a template.
+
+| VISUALS signature | Archetype |
+| :- | :- |
+| Trend poster 3.1 | `trend-poster` |
+| Ranked bar list 3.2 | `ranked-bars` (`track: fixed` for the share variant) |
+| Comparison table 3.4 | `comparison-panel` |
+| Perception split 3.5 | `perception-split` |
+| Analogy rows 3.6 | `analogy-rows` |
+| Tile taxonomy 3.7 | `card-grid` (6-10 items) or `icon-list` (8-12) |
+| Sourced shelf 3.8 | `sourced-shelf` |
+| Stage stack 3.9 | `numbered-steps`, or `funnel` for the funnel variant |
+| Stratified container 3.10 | `stratified-container` |
+| Mirrored rings 3.11 | `mirrored-rings` |
+| Composition split 3.12 | `composition-split` |
+| Distribution strip 3.13 | `distribution-strip` |
+| Variance bridge 3.14 | `variance-bridge` |
+| Quadrant map 3.15 | `quadrant-map` |
+| Causal chain 3.16 | `causal-chain` |
+
+**Two archetypes map to no signature: `hybrid-playbook` and
+`annotated-diagram`.** They render and they are kept, and selection never
+reaches them. They are available **by explicit request only**, and a run that
+uses one records that fact, because nothing in VISUALS section 2 chose it. A
+request for either is a request for a form outside the catalog: `hybrid-playbook`
+is a stats band over a section grid, which section 9.1 refuses as "a single
+dominant number ... the quote card with a numeral in it" once the number is the
+payload, and `annotated-diagram` is a hub with 4-6 parts, which is section 9.1's
+flat list of four or five peers with a label in the middle. Neither has a
+thumbnail contract in section 3 and neither has been measured against one.
+
+**`funnel` is not the stratified container.** An earlier mapping sent section
+3.10 to `funnel`, "taper only, no per-stratum counts". That is section 6.2's
+named tell: a shape whose width changes across tiers with equal counts per tier
+is decoration. `stratified-container` computes each band's width from its own
+item count, which is what section 3.10 requires.
+
+The older shape-first reading below still works for the seven original templates
+and is kept for that:
 
 - **It walks through ordered stages** ("first... then... finally", numbered
   steps, a process) -> `numbered-steps`.
@@ -44,6 +84,18 @@ below so nothing clips at 1080x1350.
 | funnel | 4-6 stages | label <= 4 words; detail <= 10 words |
 | hybrid-playbook | 2-4 stats + 3-5 sections | stat value <= 5 chars; stat label <= 4 words; section title <= 4 words; body <= 16 words |
 | annotated-diagram | 4-6 callouts | center <= 3 words; callout title <= 4 words; detail <= 10 words |
+| perception-split | 4 items + 1 punchline | panel headlines <= 36 chars; items <= 60 |
+| causal-chain | 3-4 nodes + terminal | label <= 17 chars; item <= 80 |
+| trend-poster | 6-12 points | x labels <= 4 chars; sub <= 60; needs `footer` |
+| distribution-strip | 8-30 observations | sub <= 60; reference_label <= 40; needs `footer` |
+| ranked-bars | 4-8 rows (fixed track 8-11) | sub <= 46; item <= 48; needs `footer` |
+| composition-split | 2-5 parts summing to 100 | sub and expectation <= 72; item <= 30; needs `footer` |
+| variance-bridge | 3-6 contributions | sub <= 72; item <= 26; needs `footer` |
+| sourced-shelf | 3 questions x 3 cards | sub <= 64; item <= 150; needs `footer` |
+| analogy-rows | 3-5 rows | sub <= 52; item <= 90 |
+| quadrant-map | 6-12 items, 4 quadrants filled | sub <= 120 (the placement rule); item <= 30 |
+| stratified-container | 3-5 strata, 18-26 chips | item <= 220; chip <= 21; counts monotonic by 2 |
+| mirrored-rings | 3 layers, 4-7 per side | item <= 240; chip <= 21; counts increase outward |
 
 ## Title doctrine (all archetypes)
 The headline is a **functional descriptor of what the graphic shows**, with one
@@ -54,10 +106,21 @@ source post's hook. The shape, with the slots empty rather than filled from one 
 - Source hook: a claim about a shift. -> Title: `The <N>-Step **<name>** Shift`.
 
 ## Gating discipline
-Two tiers, cheap before expensive. `--check` (fields/em-dash/banned/kicker)
-costs nothing; run it first. Only read the PNG back (the expensive visual gate)
-after `--check` is clean. Bound fixes to ~3 loops; if a layout still misses its
-rubric, ship the closest version and note the gap rather than thrash.
+Three tiers, cheap before expensive.
+
+1. **`--check`** validates spec grammar, required fields, the no-kicker rule, the
+   item counts and the character budgets, and the section 3 clauses that are
+   exact arithmetic. It launches nothing. **It does not judge language**: on a
+   visual run `draft.md` *is* the spec, so `reference/ai-tells.md` at pipeline
+   step 5 already reads every word that reaches the canvas.
+2. **The layout checks**, which run at build time on the generated HTML and
+   print with the render: thumbnail legibility, tint against the page ground,
+   reversed-label contrast. A contrast ERROR refuses the render. Reading the
+   HTML as text is what keeps the gate cheap, per PRD section 4.
+3. **The PNG**, read back once, and only after the first two are clean.
+
+Bound fixes to ~3 loops; if a layout still misses its rubric, ship the closest
+version and note the gap rather than thrash.
 
 ## Where the output lands
 `profiles/<handle>/runs/<slug>/final.png`, per PRD §5, plus

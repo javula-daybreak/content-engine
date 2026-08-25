@@ -26,24 +26,29 @@ Two things this file owns.
 `archetype:` empty. Fill it here, before any draft token is spent, per VISUALS
 §2.3 step 15. It is the only line this workflow writes into the brief.
 
-**Which signatures have a template.** Selection picks from all fifteen; seven
-templates exist.
+**Which signatures have a template.**
 
-| VISUALS signature | Template |
-| :- | :- |
-| Comparison table §3.4 | `comparison-panel` |
-| Tile taxonomy §3.7 | `card-grid` (6-10 items) or `icon-list` (8-12) |
-| Stage stack §3.9 | `numbered-steps`, or `funnel` for the funnel variant |
-| Stratified container §3.10 | `funnel`, taper only, no per-stratum counts |
-| The other eleven | **none built** |
+**All fifteen of VISUALS §3's signatures have a template, as of 2026-08-24.**
+The signature-to-builder map lives in `render/infographic/reference/method.md`
+and is maintained beside the code rather than copied here, because a second copy
+is a second place to go stale — which is exactly what happened to the five-row
+table this replaced. That table also mapped **stratified container to `funnel`,
+"taper only, no per-stratum counts,"** and that mapping was a defect: a funnel
+band carries one label and no chip cluster, so a shape narrowing across tiers
+that hold equal counts is precisely the structure lie §6.2 exists to catch.
+`stratified-container` is its own builder now.
 
-**A selected signature with no template takes VISUALS §2.4's refusal path**, and
-the refusal names the missing template rather than a deficit in the material,
-because the material was fine. Record which one: VISUALS §8's trigger for
-building the rest is three refusals naming the same template, which makes it
-countable rather than a judgment call. Two templates, `hybrid-playbook` and
-`annotated-diagram`, map to no signature in §3 and are unreachable by selection.
-Do not reach for them.
+**The no-template refusal path is dead on this path.** VISUALS §2.4's refusal
+still fires, but only for the reasons §2.4 actually names — every candidate
+disqualified, a closed-set deficit, or the clearance filter emptying the set —
+never for a missing template. VISUALS §8's "three refusals naming the same
+template" trigger has nothing left to count.
+
+`hybrid-playbook` and `annotated-diagram` map to no §3 signature and **selection
+never reaches them.** They are explicit-request-only: a run that uses one says so
+in its report. `hybrid-playbook` is a hero-number band, which §9.1 refuses once
+the number is the payload, and it requires a `footer:` source line because it
+exists to print numbers (PRD §4.2).
 
 ## Step 4b: draft the spec
 
@@ -109,13 +114,28 @@ python3 render/infographic/render.py <R>/draft.md \
   --profile <P> --out <R>/final.png --html-only
 ```
 
-`--check` validates fields, the no-kicker rule and em-dashes, and launches
-nothing. `--html-only` writes `<R>/final.png.html` and launches no browser.
+`--check` validates spec grammar and layout: required fields, the no-kicker rule,
+per-archetype count and character budgets, and the §3 disqualifiers that are
+exact arithmetic — sum-to-100, residual closure, monotonic strata, rings
+increasing outward, an empty quadrant. **It does not judge language.** It checked
+em dashes until 2026-08-20; that copy was removed because `reference/ai-tells.md`
+at step 5 is the sole authority and on a visual run `draft.md` *is* this spec, so
+the gate already reads every word that reaches the canvas. `--html-only` writes
+`<R>/final.png.html` and launches no browser.
+
+**ERROR is reserved for exact clauses.** Any clause resting on one of §3's
+`[UNVERIFIED]` ratios is a WARN that prints the measured number beside the
+threshold, because blocking a render on a number the spec itself calls a starting
+value is marking our own homework.
 
 **The rules are already written and this file adds none.** Read the HTML against
-VISUALS §5 (the measured craft rules), §6.1 (the two existing `design-tells.md`
-entries as scoped to this path), §6.2 (roughly thirty infographic-path taste
-rules), and PRD §10.3.
+`reference/design-tells.md`, which consolidates them with a citation on every
+entry: VISUALS §5's craft rules, §6.1 and §6.2's taste rules, and PRD §10.3.
+Entries are tagged, and this path reads the `[infographic]` and `[both]` ones.
+
+**Write the verdict to `runs/<slug>/design-gate.md`, and do not render before it
+exists.** That mirrors step 5's own existence check, and `design-tells.md` bound
+3 requires it on both visual paths.
 
 **Structure honesty is what to read for first.** Geometry claims things
 independently of the words: a taper claims filtering, equal tiles claim peer
@@ -126,10 +146,26 @@ language gate catches that.
 A failure goes back to step 4b and the spec is redrafted. **Do not patch the
 HTML**: it is generated, so an edit to it is gone on the next render.
 
-VISUALS §6.3's five mechanical checks are not built. Until they are, thumbnail
-legibility, tint-against-background, reversed-label contrast and line-budget
-overflow are read by eye off the HTML, and a render shipping without them
-checked says so.
+**Four of VISUALS §6.3's five mechanical checks are built** and run inside
+`check_layout(doc, theme)`, which reads the built HTML as text per PRD §4's cost
+argument: thumbnail legibility, tint-against-background, reversed-label contrast,
+and required-parameter fill. A contrast failure is an ERROR and refuses the
+render, because 4.5:1 and 3:1 are WCAG rather than taste; the other thresholds
+warn, since they are `[UNVERIFIED]`.
+
+**The fifth, line-budget overflow, is deliberately not built.** It needs a
+rendered line count per slot, which needs glyph metrics for a face `theme.json`
+only ever *names* and Chrome resolves at render time. A character-count proxy
+would be the budget check wearing the overflow check's name, and §6.3 is explicit
+that row 5 exists because row 4 already covers budgets. The upgrade path, costed
+and not taken: inject a script writing `getClientRects().length` onto each slot,
+run Chrome with `--dump-dom`, read the attributes back — a second Chrome launch
+per render.
+
+Check 1's stated ceiling: it reads the **declared** font size against a 0.70 cap
+ratio, so it cannot see a wrap, a shrink-to-fit, or a face whose real cap ratio
+differs. §6.3 row 1 asks for rendered cap height; this is the honest
+approximation, and it says so in its own docstring.
 
 ## Step 7: render
 
