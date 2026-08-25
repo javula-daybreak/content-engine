@@ -2,8 +2,11 @@
 
 The language gate. PRD section 9 is the specification; this file is the working
 list. It runs on every draft before the human sees it, including the calibration
-post at the end of setup session 1, and it is not advisory: a draft that fails
-gets rewritten, then re-measured, then shown with a diff.
+post at the end of setup session 1, and it is not advisory. A draft that fails
+is repaired or redrafted, then re-measured, then shown with a diff. **The gate
+is a detector and a redrafter. It is not a rewriter.** Which of the two a tell
+gets is spec, in the `action` column of `engine.js`'s TELLS table, and not a
+call made at run time.
 
 Loaded at gate time, never at draft time. A model drafting with the ban list in
 context writes around the list and produces the same shape in different words.
@@ -15,21 +18,34 @@ profile. Record the override in `gate-report.md` instead of rewriting. A shared
 blocklist does not get to overwrite the one file that knows what this person
 sounds like.
 
+**And this file is never edited for a person.** It ships identical to everyone
+with every rule on. A rule that over-fires on someone's own writing is
+suppressed in `profiles/<handle>/gate-calibration.md`, with the evidence that
+did it. See Maintenance.
+
 ## The four bounds
 
 Full text in PRD section 9. In short:
 
-1. **Re-measure** after every rewrite pass, or the gate flattens a draft and
-   reports a clean pass on its own flattening.
-2. **Substitute, never subtract** for lexical violations. An em dash becomes a
-   comma, a colon, or a parenthesis. **This bound is scoped to the lexical
-   tells.** Deleting a restating close or an engagement-bait question is the
-   correct rewrite for those, and a model that reads bound 2 as universal will
-   refuse to make it.
-3. **Bounded, and it always produces an artifact.** Three rewrites per 200
-   words, never the same span twice. Above the cap, redraft once from brief.md
-   with the tripped rules as drafting constraints. If that still exceeds the cap,
-   ship the better draft with one line naming what is unresolved.
+1. **Re-measure** after any repair pass and after the redraft, or the gate
+   flattens a draft and reports a clean pass on its own flattening. Bound 3's
+   comparator depends on this: it compares two measured drafts, not one measured
+   draft and one assumption.
+2. **Substitute, never subtract.** **Scoped to repairs**, which is where it
+   always applied. An em dash becomes a comma, a colon, or a parenthesis. A
+   repair that changes sentence boundaries has stopped being a repair and belongs
+   in the redraft class. Deleting a restating close or an engagement-bait
+   question is the right fix for those and neither one is a repair, so bound 2
+   never reaches them.
+3. **Bounded, and it always produces an artifact.** **The cap has changed job:
+   it bounded a rewrite budget and it now bounds repairs.** Three repairs per 200
+   words, never the same span twice. Above the cap, or on any redraft-class tell,
+   go back to brief.md and draft **once** with the tripped tell ids as
+   constraints. If the redraft still trips, both drafts are re-measured and the
+   better one ships with one line naming what is unresolved: fewer catches wins,
+   a tie breaks on distance from the voice floor, and a total tie ships the
+   first draft. `engine.js gate --compare <first> <redraft>` is the comparator,
+   so the choice is a measurement rather than a judgment.
 4. **Protected spans.** Never rewrite inside quotation marks. Never alter a
    numeral or a proper noun anywhere. A banned item in a protected span is
    reported under `not rewritten: quoted or factual` and left alone.
@@ -51,8 +67,27 @@ fails if this file and the TELLS table in `engine.js` disagree on the set.
   than a softening of it: half a promise kept is better recorded than claimed
   whole.
 
-**Rewrite** is the operative line. A tell with no rewrite is a redraft or a
-rejection, and those say so.
+**Action** is the operative line, and it is one of four. The table in
+`engine.js` owns which one each tell carries, `gate --tells` prints the column,
+and this file's operative line says what that action does:
+
+- **Repair.** Mechanical, and unable to restructure a sentence by construction.
+  One token swapped for its documented substitute, bounded by bound 4's
+  protected spans and capped by bound 3. `action: rewrite` in the table, which
+  is the string `gate-report.md` prints and the string the negative control's
+  bar is written in.
+- **Redraft.** Anything that would restructure prose. The gate returns to
+  `brief.md` and drafts once with the tripped ids injected as constraints. **No
+  span patching, ever.** A model composing under a constraint writes around it;
+  a model patching a violation in place contorts around it.
+- **Reject.** Clearance and private terms. Rewriting a disclosure only produces
+  a better-written disclosure.
+- **Flag.** Information for the human. No word changes and the gate still
+  passes, which is why a flag is reported beside the pass rather than swallowed
+  by it.
+
+Only a **repair** is suppressible per profile, because only a repair edits a
+word the person wrote. See Maintenance.
 
 ---
 
@@ -64,7 +99,7 @@ rejection, and those say so.
 Y is."
 **Owner:** both (`antithesis`). The two forms above are regexes. The open form,
 where the negation and the correction sit in separate paragraphs, is yours.
-**Rewrite:** keep one side. State the claim and drop the negated half, which
+**Redraft:** keep one side. State the claim and drop the negated half, which
 carries no information the positive half lacks. "It's not a documentation
 problem, it's a memory problem" becomes "The documentation was fine. The context
 around it was gone." Substitution here means replacing the construction with the
@@ -81,7 +116,7 @@ rewrite of good writing on every future draft forever.
 The test is whether a fourth item exists and was dropped for rhythm, or whether
 the third is a restatement of the first.
 **Owner:** model. "Unearned" is the whole judgment.
-**Rewrite:** cut to the number the material supports, usually two, or add the
+**Redraft:** cut to the number the material supports, usually two, or add the
 real fourth. Do not renumber and leave the padding in place.
 
 ### parallel-bullets
@@ -89,14 +124,14 @@ real fourth. Do not renumber and leave the padding in place.
 **Fires on:** every bullet opening on the same part of speech and landing within
 a word or two of the same length.
 **Owner:** model.
-**Rewrite:** break the parallel on at least one item. Uneven is human.
+**Redraft:** break the parallel on at least one item. Uneven is human.
 
 ### rhetorical-fragment
 
 **Fires on:** "The result?", "The kicker?", "Here's the thing", and the shape:
 any standalone one-word or two-word line ending in `?` or `:`.
 **Owner:** engine (`rhetorical-fragment`).
-**Rewrite:** fold it into the sentence that follows. The line is a drum roll,
+**Redraft:** fold it into the sentence that follows. The line is a drum roll,
 and the sentence after it is the content.
 
 A numeral anywhere on the line disqualifies it, so a date used as a section
@@ -107,21 +142,21 @@ marker is not read as rhetoric.
 **Fires on:** a final paragraph that repeats the post's claim in different
 words and adds nothing.
 **Owner:** model.
-**Rewrite:** delete it. Bound 2 does not apply, per the note above: the post
-ends one paragraph earlier and is better for it.
+**Redraft:** the post ends one paragraph earlier and is better for it. Bound 2
+never reaches this one: it is scoped to repairs and this is not one.
 
 ### engagement-bait-close
 
 **Fires on:** "Thoughts?", "What's your take?"
 **Owner:** engine (`engagement-bait-close`).
-**Rewrite:** delete, or replace with a question only this writer could ask,
+**Redraft:** delete, or replace with a question only this writer could ask,
 naming the specific thing they want to know and from whom.
 
 ### thinking-opener
 
 **Fires on:** "I've been thinking a lot about"
 **Owner:** engine (`thinking-opener`).
-**Rewrite:** start at the second sentence. A post opening on the announcement
+**Redraft:** start at the second sentence. A post opening on the announcement
 that thinking occurred is nearly always better without its first sentence.
 
 ### uniform-paragraphs
@@ -129,7 +164,7 @@ that thinking occurred is nearly always better without its first sentence.
 **Fires on:** three or more paragraphs all holding the same number of lines,
 where that number is two or more.
 **Owner:** engine (`uniform-paragraphs`).
-**Rewrite:** merge two paragraphs, or split one. Any asymmetry clears it.
+**Redraft:** merge two paragraphs, or split one. Any asymmetry clears it.
 
 The two-line floor is deliberate. A post of one-line paragraphs throughout is a
 documented human habit, named in `inspiration.md` as a usable extraction, and
@@ -143,14 +178,22 @@ firing on it would strike a real style as a machine artifact.
 
 **Fires on:** any em dash. Zero tolerance.
 **Owner:** engine (`em-dash`).
-**Rewrite:** comma, colon, or parenthesis, whichever the clause wants. Never a
+**Repair:** comma, colon, or parenthesis, whichever the clause wants. Never a
 period: splitting the sentence is bound 2's named failure.
+
+Section 9's enumerated repair list does not name the em dash, and it is a repair
+anyway. That list was written expecting this rule to be struck globally, and
+bound 2 settles the class on its own: it names the em dash as its worked example
+of a substitution and forbids the sentence split that would make it a
+restructure. **It is not struck. It is the likeliest rule to be suppressed per
+profile**, which is a different thing: it stays on for everyone it has not been
+measured against.
 
 ### en-dash
 
 **Fires on:** any en dash not flanked by digits on both sides.
 **Owner:** engine (`en-dash`).
-**Rewrite:** "to" for a range, a hyphen for a compound.
+**Repair:** "to" for a range, a hyphen for a compound.
 
 Between digits it is correct typography and does not fire. `2023-2024` and
 `90-120 days` are legal.
@@ -159,18 +202,19 @@ Between digits it is correct typography and does not fire. `2023-2024` and
 
 **Fires on:** any semicolon, in short posts only.
 **Owner:** engine (`semicolon`).
-**Rewrite:** a comma or a colon. A period is also acceptable here specifically,
+**Repair:** a comma or a colon. A period is also acceptable here specifically,
 because both clauses survive it intact, which is the thing bound 2 protects.
 
 Not scanned in articles or long form, and not scanned on a pasted sample whose
-`kind:` is not a post.
+`kind:` is not a post. A repair for the same reason the em dash is, and
+suppressible per profile for the same reason too.
 
 ### banned-lexicon
 
 **Fires on:** the nineteen terms in section 9. Single words match with suffixes,
 so "leveraged" and "unpacking" both fire. Phrases match literally.
 **Owner:** engine (`banned`).
-**Rewrite:** the plain word.
+**Repair:** the plain word.
 
 | term | substitute |
 | :- | :- |
@@ -209,14 +253,14 @@ important rule broken by this file's own mechanism.
 **Fires on:** "not only" followed within a clause by "but ... also", including
 the drifted forms "but we also" and "but they also".
 **Owner:** engine (`not-only-but-also`).
-**Rewrite:** "X and Y", or two sentences.
+**Redraft:** "X and Y", or two sentences.
 
 ### hedged-opener
 
 **Fires on:** "In many ways,", "It's worth noting that"
 **Owner:** both (`hedged-opener`). Those two are literal. The open category,
 every construction that apologises before making a claim, is yours.
-**Rewrite:** delete the hedge and keep the claim. The claim was the sentence.
+**Redraft:** delete the hedge and keep the claim. The claim was the sentence.
 
 ---
 
@@ -230,14 +274,14 @@ this in week two.
 **Fires on:** "we're excited to share", "we're thrilled to", "we're proud to",
 "join us", "stay tuned", "more in the comments"
 **Owner:** engine (`announcement`).
-**Rewrite:** open on the news. Name the person and what they did. The excitement
+**Redraft:** open on the news. Name the person and what they did. The excitement
 was never the information.
 
 ### at-company-we-believe
 
 **Fires on:** "at <Company>, we believe"
 **Owner:** engine (`at-company-we-believe`).
-**Rewrite:** name who believes it and what they did about it. A belief with no
+**Redraft:** name who believes it and what they did about it. A belief with no
 action attached is a slogan.
 
 Matches sentence-initial and mid-sentence. The capital on the company name is
@@ -248,7 +292,7 @@ what separates the tell from an ordinary preposition.
 **Fires on:** first-person plural anywhere in the post and no named person
 anywhere in it.
 **Owner:** engine (`we-with-no-human`).
-**Rewrite:** name one person and what they did.
+**Redraft:** name one person and what they did.
 
 Approximated by the absence of any capitalized word in a non-sentence-initial
 position, the same rule the specifics floor uses. It under-fires: a post naming
@@ -263,15 +307,15 @@ is a clearance problem and not a rewrite. See `clearance` below.
 **Fires on:** a post whose only news is that news exists. No number, no named
 person, no before and after, nothing a reader could act on.
 **Owner:** model.
-**Rewrite:** none. Redraft from brief.md, or do not post. There is nothing to
-substitute for absent content.
+**Redraft:** from brief.md, or do not post. There is nothing to substitute for
+absent content, which is why no repair exists for this one.
 
 ### testimonial-quote
 
 **Fires on:** a customer quote deployed as proof rather than as speech.
 Recognisable by the quote having no speaker context and no disagreement in it.
 **Owner:** model.
-**Rewrite:** cut it, or give the customer a full sentence of their own with the
+**Redraft:** cut it, or give the customer a full sentence of their own with the
 situation around it.
 
 ---
@@ -283,7 +327,7 @@ situation around it.
 **Fires on:** no sentence under 6 words, where `voice.md` records no baseline.
 Humans use fragments.
 **Owner:** engine (`no-fragments`).
-**Rewrite:** break one sentence and let the second half stand alone.
+**Flag:** break one sentence and let the second half stand alone.
 
 Overridden by `voice.md`'s `uses_fragments: no`. Someone who writes in complete
 sentences is not producing a tell by continuing to.
@@ -292,7 +336,7 @@ sentences is not producing a tell by continuing to.
 
 **Fires on:** no sentence over 25 words, where `voice.md` records no baseline.
 **Owner:** engine (`no-long-sentence`).
-**Rewrite:** join two related sentences.
+**Flag:** join two related sentences.
 
 The absolute half of section 9's voice floor, live only until samples exist.
 Both halves retire the moment `voice.md` carries measurements.
@@ -301,7 +345,7 @@ Both halves retire the moment `voice.md` carries measurements.
 
 **Fires on:** a contraction rate of zero across 40 words or more.
 **Owner:** engine (`zero-contractions`).
-**Rewrite:** contract the two or three that read most naturally aloud. Do not
+**Redraft:** contract the two or three that read most naturally aloud. Do not
 contract every candidate.
 
 Overridden when `voice.md` records a measured rate of zero. Forty words is the
@@ -315,29 +359,29 @@ floor because a two-line post without a contraction is evidence of nothing.
 not contractible sites. One hundred percent is not expressible in that number,
 and no measurable definition exists without a contractible-site count nobody has
 built. It stays a judgment until someone needs it enough to build one.
-**Rewrite:** expand two or three, usually the ones carrying emphasis.
+**Redraft:** expand two or three, usually the ones carrying emphasis.
 
 ### emoji-bullets
 
 **Fires on:** a line opening on an emoji.
 **Owner:** engine (`emoji-bullets`).
-**Rewrite:** a hyphen, or no bullet at all. An emoji inside a sentence is not
+**Repair:** a hyphen, or no bullet at all. An emoji inside a sentence is not
 this tell and does not fire.
 
 ### hashtag-stack
 
 **Fires on:** three or more hashtags. Three is a stack.
 **Owner:** engine (`hashtag-stack`).
-**Rewrite:** keep at most two, or none. Deleting them is the correct repair and
-not a violation of bound 2, which is scoped to lexical tells. It counts as one
-rewrite against bound 3's cap.
+**Repair:** keep at most two, or none. Deleting them is the correct repair and
+not a violation of bound 2, which is scoped to the substitutions. It counts as
+one repair against bound 3's cap.
 
 ### title-case-header
 
 **Fires on:** a short unpunctuated line of three or more words where at least
 70% are capitalized.
 **Owner:** engine (`title-case-header`).
-**Rewrite:** sentence case, or fold the line into the paragraph under it.
+**Repair:** sentence case, or fold the line into the paragraph under it.
 
 Cannot separate a header from a line of proper nouns, so a name list is a known
 false positive. Raise the ratio if that fires in practice.
@@ -353,8 +397,8 @@ The gate can fail on absence, not only on presence.
 **Fires on:** zero named people, companies, dates, or numerals in the whole
 draft.
 **Owner:** engine (`specifics-floor`).
-**Rewrite:** none. **Redraft.** An abstraction cannot be patched into an
-instance, and patching one produces an abstraction with a number in it.
+**Redraft:** an abstraction cannot be patched into an instance, and patching one
+produces an abstraction with a number in it.
 
 Counted over split sentences rather than raw text, so a numbered list does not
 clear the floor on its own numbering.
@@ -364,11 +408,77 @@ clear the floor on its own numbering.
 **Fires on:** a draft's sentence-length stdev or contraction rate more than 25%
 below the value frozen in `voice.md` at setup.
 **Owner:** engine (`voice-floor`).
-**Rewrite:** flag, not rewrite. It reports a distance, and the fix is a
-different draft rather than a different sentence.
+**Redraft:** it reports a distance, and the fix is a different draft rather than
+a different sentence. Section 9 lists the voice floor in the redraft class for
+exactly that reason: there is no span to edit, because the finding is a property
+of the whole draft.
 
 Needs a baseline, so it cannot fire in the fixture corpus. Covered by an assert
 in `engine.js selfTest` instead.
+
+---
+
+## The three distribution checks
+
+Added 2026-08-24, PRD §9's Phase 2 checks. All three measure the whole draft
+rather than a span, all three are redraft-class for that reason, and none is
+suppressible: a redraft edits no word the person wrote, so there is nothing for a
+suppression to protect. Each floors against `gate-calibration.md`'s baseline for
+this person at 75% of it, the same `VOICE_FLOOR` band the voice floor uses, and
+falls back to an absolute only where that person has no baseline for the metric.
+The report always names which of the two it used.
+
+All three need enough text to be a distribution: 100 words and 5 sentences
+(`DIST_MIN_WORDS`, `DIST_MIN_SENTENCES`). Below that the coefficient of variation
+is noise, and firing on noise is the false positive this file's maintenance rule
+says costs a rewrite of good writing on every future draft forever.
+
+**The direction is per metric, because the drift is per metric.** Burstiness and
+punctuation density flatten *downward* under machine drafting; nominalisation
+inflates *upward*. A floor on nominalisation would be a check that cannot fire on
+the text it was written to catch.
+
+### burstiness
+
+**Fires on:** sentence-length coefficient of variation below the band. Absolute
+fallback `BURSTINESS_FLOOR` 0.45.
+**Owner:** engine (`burstiness`).
+**Redraft:** there is no span to edit. Uniform sentence length is a property of
+the whole draft, and the fix is a different draft.
+
+Human text benchmarks 0.60-1.00 and machine text 0.15-0.30. The fallback sits
+between the two bands rather than at the bottom of the human one, and the known
+ceiling is that a genuinely flat 0.50 draft walks past. The alternative fires on
+real short posts, which is the more expensive error.
+
+### punctuation-density
+
+**Fires on:** commas, semicolons, parentheses and dashes per 100 words below the
+band. Absolute fallback `PUNCT_DENSITY_FLOOR` 2.0, below which there is no clause
+structure left at all.
+**Owner:** engine (`punctuation-density`).
+**Redraft:** same reason. Clause structure is not a span.
+
+This is the strongest 2026 tell and it was blocked for a long time, on the
+grounds that a density floor cannot bind while two of its four inputs are banned
+at zero tolerance. **What unblocked it was not a retirement.** Under
+`gate-calibration.md` nothing is struck globally: the floor is measured against
+the person's own baseline, and if the em dash or the semicolon is suppressed for
+them, the mark is theirs to use and the density it produces is theirs to be
+measured against. The contradiction was never between the two rules. It was in
+retiring them for everybody.
+
+### nominalisation-rate
+
+**Fires on:** `-tion`, `-ment`, `-ness`, `-ity`, `-ance` and `-ence` per 100
+words **above** the band. Absolute ceiling `NOMINALISATION_CEILING` 5.0.
+**Owner:** engine (`nominalisation-rate`).
+**Redraft:** turning nouns back into verbs is a rewrite of the sentence's spine,
+which is the line PRD §9 draws between a repair and a redraft.
+
+The one check in this file with a ceiling rather than a floor. Read the direction
+before editing it: inverting it produces a rule that fires on plain writing and
+passes the abstraction it exists to catch.
 
 ---
 
@@ -379,14 +489,18 @@ in `engine.js selfTest` instead.
 **Fires on:** a company, a person, a role-plus-employer-plus-timeframe triple,
 or a figure whose source item is not `clearance: public`.
 **Owner:** model.
-**Rewrite:** none. **Reject and redraft.** Rewriting a disclosure only produces
-a better-written disclosure.
+**Reject:** and redraft. Rewriting a disclosure only produces a better-written
+disclosure.
 
 ### private-terms
 
 **Fires on:** any literal string in `brief.md`'s `private_terms:`.
 **Owner:** engine (`private-terms`).
-**Rewrite:** none. **Reject and redraft.**
+**Reject:** and redraft.
+
+**Never suppressible.** `gate-calibration.md` rule 4 refuses a file naming this
+rule, and the engine refuses to honour it even if one arrived, because a file
+inside the profile is not a consent form for a disclosure.
 
 Deterministic on purpose, per section 9: the material it guards is the kind a
 tired human approves at 8am. Needs a `brief.md` beside the draft, so it cannot
@@ -438,11 +552,29 @@ Living file. When Joseph spots a tell in the wild he says so, and it is appended
 here with the date **and the post that showed it is added to `gate-fixtures/`**.
 A tell with no fixture is a claim with no test.
 
-Entries are retired by strikethrough on the heading, `### ~~tell-id~~`, with the
-date and the reason, so the rule stops firing and stays visible. Retire one when
-it fires on this person's own writing or on an `inspiration.md` post. A rule
-that is wrong costs a rewrite of good writing on every future draft forever, and
-precision can only decay.
+**Nothing in this file is retired because it fired on one person. Changed
+2026-08-24.** This passage read that an entry is retired by strikethrough *"when
+it fires on this person's own writing or on an `inspiration.md` post."* That was
+wrong, and not only in scheduling. **This file ships to everyone.** Striking a
+rule here because it over-fires on one person's writing hardcodes that person's
+punctuation habits into every future install, which is a portability defect
+wearing the costume of a calibration step, and it fails the commitment that this
+engine is handable to anyone.
+
+**A rule that fires on someone's own writing is suppressed for them, in
+`profiles/<handle>/gate-calibration.md`, with the count and the sample that did
+it.** Every rule here ships on, for everyone. Setup measures the suppression per
+person from their own pasted samples and writes it; the engine reads it; nothing
+is switched off by hand and nothing is switched off globally. Only a repair is
+suppressible, because only a repair edits a word the person wrote. A reject never
+is.
+
+**Retirement still exists, for one case only:** a rule that is wrong *as a rule*,
+which means wrong about machine writing rather than inconvenient for one human.
+That is struck by strikethrough on the heading, `### ~~tell-id~~`, with the date
+and the reason, so it stops firing and stays visible. The evidence for it is
+never one corpus. A rule that is wrong costs a rewrite of good writing on every
+future draft forever, and precision can only decay.
 
 Deleting a retired entry is the mistake to avoid: the next person to notice the
 same pattern re-adds it, and the reason it failed is gone.

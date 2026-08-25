@@ -17,12 +17,13 @@
 //
 // Usage:
 //   node reference/engine.js overlap <draft.md> <profile-dir>
-//   node reference/engine.js lexical <draft.md> [--short]
+//   node reference/engine.js lexical <draft.md> [profile-dir] [--short]
 //   node reference/engine.js stats   <draft.md> [profile-dir]
 //   node reference/engine.js locks   <profile-dir>
 //   node reference/engine.js gate    [fixtures-dir]
 //   node reference/engine.js gate    --report <draft.md> [profile-dir] [--long]
 //   node reference/engine.js gate    --negative <profile-dir>
+//   node reference/engine.js gate    --compare <first.md> <redraft.md> [profile-dir]
 //   node reference/engine.js gate    --hooks [hooks.md]
 //   node reference/engine.js gate    --tells [ai-tells.md]
 //   node reference/engine.js test
@@ -70,6 +71,9 @@ const HASHTAG_STACK = 3;
 // evidence of anything, so a two-line post does not fire it.
 const CONTRACTION_FLOOR_WORDS = 40;
 // Section 9 bound 3. Tuned at section 13.2 step 8 against ten real posts.
+// The cap has changed job: it bounded a rewrite budget and it now bounds
+// repairs, because repair is all the editing section 9 leaves. The redraft
+// happens once, and above the cap the run goes back to brief.md.
 const REWRITE_CAP_PER = 3;
 const REWRITE_CAP_WORDS = 200;
 // Section 9: "every paragraph the same number of lines". Three paragraphs is
@@ -80,54 +84,150 @@ const UNIFORM_PARA_MIN = 3;
 // output at two lines and above.
 const UNIFORM_PARA_LINES = 2;
 // Section 9's voice floor: flag at more than 25% below the value in voice.md.
+// Reused by the three distribution checks below, in both directions: 25% below
+// a baseline is b * VOICE_FLOOR and 25% above it is b / VOICE_FLOOR.
 const VOICE_FLOOR = 0.75;
+
+// Section 9's three Phase 2 checks, and the absolute fallbacks that apply where
+// gate-calibration.md carries no baseline for the person. Each is a knob tuned
+// at section 13.2 step 8, not a measured constant.
+//
+// ponytail: burstiness benchmarks are 0.60-1.00 for human text and 0.15-0.30
+// for AI text, and this floor sits between the two bands rather than at the
+// bottom of the human one. The ceiling is that a genuinely flat 0.50 draft
+// walks past; the alternative fires on real short posts, and section 9's
+// maintenance rule is that precision can only decay.
+const BURSTINESS_FLOOR = 0.45;
+// Marks per 100 words. Below two there is no clause structure left at all.
+const PUNCT_DENSITY_FLOOR = 2.0;
+// Nominalisations per 100 words, and this one is a ceiling rather than a floor.
+const NOMINALISATION_CEILING = 5.0;
+// All three are distributions, and three sentences is not one. Below these the
+// coefficient of variation is noise and firing on noise is the false positive
+// section 9 says costs a rewrite of good writing on every future draft forever.
+const DIST_MIN_WORDS = 100;
+const DIST_MIN_SENTENCES = 5;
+// profiles/<handle>/gate-calibration.md. Written by setup and by
+// /content-engine review, read here, never written here.
+const CALIBRATION_FILE = 'gate-calibration.md';
 // Section 13.1: the diff corpus is the last 20 shipped pieces.
 const PRIOR_LIMIT = 20;
 // Section 13.2 step 4: gate-fixtures/ holds 20 known-AI posts.
 const FIXTURE_COUNT = 20;
 
-// Section 9's tells, one row each, with the half that owns it.
-// `reference/ai-tells.md` carries the prose: what fires, how it gets rewritten,
-// and whether it has been struck. This table carries the ownership and the tag
-// the gate report prints, and `gate --tells` is what keeps the two in step.
+// Section 9's tells, one row each: the half that owns it, the tag the gate
+// report prints, and the action it carries. `reference/ai-tells.md` carries the
+// prose, and `gate --tells` is what keeps the two in step.
 //
 // owner 'engine' means a literal or a count, and section 9's "zero tolerance"
 // is a promise this file keeps for it. 'model' means a judgment, and the tag is
 // null because nothing here can produce it. 'both' means the forms section 9
 // names by name are caught here and the open category is not, which is the
 // honest reading of section 9's split rather than a softening of it.
+//
+// action is section 9's "detect, then repair or redraft", decided 2026-08-19.
+// Which class a tell carries is spec, not a call made at run time:
+//
+//   'rewrite'  section 9's *repair*. One token swapped for its documented
+//              substitute, bounded by the protected spans in bound 4 and capped
+//              by bound 3. Cannot restructure a sentence by construction.
+//   'redraft'  anything that would restructure prose. Back to brief.md, once,
+//              with the tripped ids as drafting constraints. No span patching,
+//              ever.
+//   'reject'   clearance and private terms. Rewriting a disclosure only
+//              produces a better-written disclosure.
+//   'flag'     the absolute half of section 9's voice floor. Information for
+//              the human, no word changed, and it does not fail the gate. Both
+//              halves retire the moment voice.md carries measurements.
+//
+// Why the line falls there. Berkeley's *Voice Under Revision* (arXiv:2604.22142)
+// measured drift at the sentence and structure level across 300 narratives and
+// three frontier models, and the load-bearing finding is the qualifier on all of
+// it: voice-preserving prompts reduce the magnitude of the changes and do not
+// eliminate their direction. Swapping one word for its documented substitute
+// restructures nothing. Rewriting "it's not X, it's Y" restructures the
+// sentence, which is the level the drift was measured at.
+//
+// The repair class is spelled 'rewrite' and not 'repair' on purpose. It is the
+// string gate-report.md already prints, the string section 13.2 step 4's
+// negative control bar is written in ("zero rewrites on the person's own
+// samples"), and the string gate-calibration.md rule 4 names as the only
+// suppressible class. Renaming it is section 8's hook_id failure exactly: every
+// prior reference still resolves, just not to its own rule.
+//
+// em-dash and semicolon are repairs, and neither appears in section 9's
+// enumerated repair list, because that list was written expecting both to be
+// retired globally. They are not retired: they are suppressible per profile, in
+// profiles/<handle>/gate-calibration.md. Their class is settled by bound 2,
+// which names the em dash as its own worked example of a substitution and
+// forbids the sentence split that would make it a restructure.
 const TELLS = [
-  { id: 'antithesis', owner: 'both', tag: 'antithesis' },
-  { id: 'unearned-rule-of-three', owner: 'model', tag: null },
-  { id: 'parallel-bullets', owner: 'model', tag: null },
-  { id: 'rhetorical-fragment', owner: 'engine', tag: 'rhetorical-fragment' },
-  { id: 'restating-close', owner: 'model', tag: null },
-  { id: 'engagement-bait-close', owner: 'engine', tag: 'engagement-bait-close' },
-  { id: 'thinking-opener', owner: 'engine', tag: 'thinking-opener' },
-  { id: 'uniform-paragraphs', owner: 'engine', tag: 'uniform-paragraphs' },
-  { id: 'em-dash', owner: 'engine', tag: 'em-dash' },
-  { id: 'en-dash', owner: 'engine', tag: 'en-dash' },
-  { id: 'semicolon', owner: 'engine', tag: 'semicolon' },
-  { id: 'banned-lexicon', owner: 'engine', tag: 'banned' },
-  { id: 'not-only-but-also', owner: 'engine', tag: 'not-only-but-also' },
-  { id: 'hedged-opener', owner: 'both', tag: 'hedged-opener' },
-  { id: 'announcement-phrase', owner: 'engine', tag: 'announcement' },
-  { id: 'at-company-we-believe', owner: 'engine', tag: 'at-company-we-believe' },
-  { id: 'we-with-no-human', owner: 'engine', tag: 'we-with-no-human' },
-  { id: 'announcement-shape', owner: 'model', tag: null },
-  { id: 'testimonial-quote', owner: 'model', tag: null },
-  { id: 'no-fragments', owner: 'engine', tag: 'no-fragments' },
-  { id: 'no-long-sentence', owner: 'engine', tag: 'no-long-sentence' },
-  { id: 'zero-contractions', owner: 'engine', tag: 'zero-contractions' },
-  { id: 'all-contractions', owner: 'model', tag: null },
-  { id: 'emoji-bullets', owner: 'engine', tag: 'emoji-bullets' },
-  { id: 'hashtag-stack', owner: 'engine', tag: 'hashtag-stack' },
-  { id: 'title-case-header', owner: 'engine', tag: 'title-case-header' },
-  { id: 'specifics-floor', owner: 'engine', tag: 'specifics-floor' },
-  { id: 'voice-floor', owner: 'engine', tag: 'voice-floor' },
-  { id: 'clearance', owner: 'model', tag: null },
-  { id: 'private-terms', owner: 'engine', tag: 'private-terms' },
+  { id: 'antithesis', owner: 'both', tag: 'antithesis', action: 'redraft' },
+  { id: 'unearned-rule-of-three', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'parallel-bullets', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'rhetorical-fragment', owner: 'engine', tag: 'rhetorical-fragment', action: 'redraft' },
+  { id: 'restating-close', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'engagement-bait-close', owner: 'engine', tag: 'engagement-bait-close', action: 'redraft' },
+  { id: 'thinking-opener', owner: 'engine', tag: 'thinking-opener', action: 'redraft' },
+  { id: 'uniform-paragraphs', owner: 'engine', tag: 'uniform-paragraphs', action: 'redraft' },
+  { id: 'em-dash', owner: 'engine', tag: 'em-dash', action: 'rewrite' },
+  { id: 'en-dash', owner: 'engine', tag: 'en-dash', action: 'rewrite' },
+  { id: 'semicolon', owner: 'engine', tag: 'semicolon', action: 'rewrite' },
+  { id: 'banned-lexicon', owner: 'engine', tag: 'banned', action: 'rewrite' },
+  { id: 'not-only-but-also', owner: 'engine', tag: 'not-only-but-also', action: 'redraft' },
+  { id: 'hedged-opener', owner: 'both', tag: 'hedged-opener', action: 'redraft' },
+  { id: 'announcement-phrase', owner: 'engine', tag: 'announcement', action: 'redraft' },
+  { id: 'at-company-we-believe', owner: 'engine', tag: 'at-company-we-believe', action: 'redraft' },
+  { id: 'we-with-no-human', owner: 'engine', tag: 'we-with-no-human', action: 'redraft' },
+  { id: 'announcement-shape', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'testimonial-quote', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'no-fragments', owner: 'engine', tag: 'no-fragments', action: 'flag' },
+  { id: 'no-long-sentence', owner: 'engine', tag: 'no-long-sentence', action: 'flag' },
+  { id: 'zero-contractions', owner: 'engine', tag: 'zero-contractions', action: 'redraft' },
+  { id: 'all-contractions', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'emoji-bullets', owner: 'engine', tag: 'emoji-bullets', action: 'rewrite' },
+  { id: 'hashtag-stack', owner: 'engine', tag: 'hashtag-stack', action: 'rewrite' },
+  { id: 'title-case-header', owner: 'engine', tag: 'title-case-header', action: 'rewrite' },
+  { id: 'specifics-floor', owner: 'engine', tag: 'specifics-floor', action: 'redraft' },
+  { id: 'voice-floor', owner: 'engine', tag: 'voice-floor', action: 'redraft' },
+  // Section 9's three Phase 2 checks. Counts, not judgments, and all three are
+  // redraft-class: a distribution is a property of the whole draft and there is
+  // no span to patch. Punctuation density shipped last, and the thing that
+  // unblocked it was not a retirement. See statsText.
+  { id: 'burstiness', owner: 'engine', tag: 'burstiness', action: 'redraft' },
+  { id: 'punctuation-density', owner: 'engine', tag: 'punctuation-density', action: 'redraft' },
+  { id: 'nominalisation-rate', owner: 'engine', tag: 'nominalisation-rate', action: 'redraft' },
+  { id: 'clearance', owner: 'model', tag: null, action: 'reject' },
+  { id: 'private-terms', owner: 'engine', tag: 'private-terms', action: 'reject' },
 ];
+
+const tellById = new Map(TELLS.map(x => [x.id, x]));
+// One tag per tell and one tell per tag, which is what lets a hit carry its id
+// back. Pinned by assert, because a duplicated tag would silently route a
+// suppression or an action to the wrong rule.
+const tellByTag = new Map(TELLS.filter(x => x.tag).map(x => [x.tag, x]));
+
+// The table owns the class. Every emitting site reads it here instead of
+// repeating the literal, so `gate --tells`'s promise holds for the actions and
+// not only for the ids: a row changed in one place cannot disagree with itself.
+const actionOf = id => (tellById.get(id) || {}).action || 'flag';
+
+// gate-calibration.md rule 4: only a rewrite-class rule is suppressible. A
+// reject never is, and a redraft or a flag edits no word the person wrote, so
+// there is nothing to suppress. Enforced twice on purpose. parseCalibration
+// refuses a file that names anything else, and every consult site asks this
+// function rather than the list, so no caller can honour a suppression the
+// parser would have refused. The material `reject` guards is the kind section 9
+// says a tired human approves at 8am, and a file inside the profile is not a
+// consent form for disclosing it.
+function suppressible(id) {
+  const t = tellById.get(id);
+  return !!t && t.action === 'rewrite';
+}
+
+function isSuppressed(cal, id) {
+  return !!cal && !!id && cal.suppressed.indexOf(id) !== -1 && suppressible(id);
+}
 
 // Section 9's lexical list, verbatim. Single words match on a word boundary
 // and allow suffixes, so "leveraged" and "unpacking" both fire. Phrases match
@@ -345,25 +445,41 @@ function frontMatter(text) {
   return out;
 }
 
-// inventory.md items. Blocks starting at "- id:" under any heading.
-function inventoryItems(text) {
+// Indented key/value blocks led by "- <leadKey>:", under any heading. Two
+// schemas in this repo have that shape: inventory.md's items, led by `id`, and
+// gate-calibration.md's suppressions, led by `rule`. One parser reads both.
+// Fences are stripped for the same reason everywhere else: every one of these
+// files documents its own schema in a fence, and that example is a
+// syntactically perfect item.
+function blockItems(text, leadKey) {
   const items = [];
-  const blocks = stripFences(text).split(/\n(?=\s*-\s+id:)/);
+  const head = new RegExp('^\\s*-\\s+' + leadKey + ':');
+  const blocks = stripFences(text).split(new RegExp('\\n(?=\\s*-\\s+' + leadKey + ':)'));
   for (const block of blocks) {
-    if (!/^\s*-\s+id:/.test(block)) continue;
+    if (!head.test(block)) continue;
     const item = {};
     let key = null;
     for (const raw of block.split(/\r?\n/)) {
       if (/^\s*```/.test(raw)) break;
       const m = raw.match(/^\s*(?:-\s+)?([A-Za-z_][\w-]*):\s*(.*)$/);
       if (m) { key = m[1]; item[key] = stripValue(m[2]); continue; }
-      if (key && raw.trim() && typeof item[key] === 'string') {
+      // The continuation line must be INDENTED, which is the same guard
+      // frontMatter uses. Without it any non-empty line that is not a key:
+      // match gets glued onto the previous field, so the `## baselines`
+      // heading that follows the last suppression in gate-calibration.md
+      // landed inside its `sample:` value, and an inventory item followed by
+      // prose absorbed the prose. Fixed 2026-08-24.
+      if (key && /^\s+\S/.test(raw) && typeof item[key] === 'string') {
         item[key] = (item[key] + ' ' + raw.trim()).trim();
       }
     }
-    if (item.id) items.push(item);
+    if (item[leadKey]) items.push(item);
   }
   return items;
+}
+
+function inventoryItems(text) {
+  return blockItems(text, 'id');
 }
 
 // "text: |" blocks under a "- <leadKey>:" line. shipped-history.md and
@@ -422,6 +538,96 @@ function voiceMeasures(text) {
   }
   out.uses_fragments = pick('uses_fragments', s => /^(yes|no)$/.test(s));
   return out;
+}
+
+// profiles/<handle>/gate-calibration.md, the per-profile layer over a
+// person-independent rule set.
+//
+// `reference/ai-tells.md` ships identical to everyone with every rule on. It is
+// never edited for a person: striking a rule there because it over-fires on one
+// corpus hardcodes one person's punctuation habits into every future install of
+// a portable engine. Rules are suppressed per profile, in the profile, with the
+// evidence that did it, and this is the read path for that file. Setup and
+// /content-engine review write it. Nothing here writes it.
+//
+// The five rules, and where each one lives:
+//   1. Evidence only: a `fired:` count over 0 on the person's own corpus, and
+//      the sample that did it. Enforced below. `gate --negative` produces it.
+//   2. Absent file, or absent key, means nothing is suppressed and every rule
+//      fires. Enforced by returning an empty list rather than throwing, and a
+//      missing calibration is reported by name so it cannot read as a clean
+//      pass.
+//   3. A suppressed rule is reported, never silent: `gate --report` names it and
+//      `gate` recall states it, because recall measured over a suppressed rule
+//      is a number the engine did not earn.
+//   4. Rewrite-class only. `suppressible` above, and a throw here.
+//   5. The tell table and ai-tells.md stay in lockstep, because neither of them
+//      changes per person. `gate --tells` is unaffected by this file.
+//
+// Fences are stripped before anything is read, and that is load bearing rather
+// than tidy: `profiles/_template/gate-calibration.md` carries its whole schema
+// inside a fence, so the shipped template cannot be read as a real suppression.
+// This is the same trap voice.md's Samples section documents, in the other
+// direction: there a filled-in fence yields an empty corpus, here it yields an
+// empty suppression list, and in both cases the safe answer is the one a
+// mistake lands on.
+function parseCalibration(text) {
+  const body = stripFences(text);
+  const meta = frontMatter(body);
+  const evidence = [];
+  for (const row of blockItems(body, 'rule')) {
+    const id = String(row.rule);
+    const tell = tellById.get(id);
+    if (!tell) {
+      throw new Error(CALIBRATION_FILE + ': "' + id + '" is not a tell in ' +
+        'engine.js\'s table. A suppression naming nothing suppresses nothing, ' +
+        'and reading it as a clean pass is rule 2\'s whole failure mode.');
+    }
+    if (!suppressible(id)) {
+      throw new Error(CALIBRATION_FILE + ': "' + id + '" is ' + tell.action +
+        '-class and is never suppressible. Rule 4. Only a repair edits a word ' +
+        'the person wrote, so only a repair can be wrong about them; a reject ' +
+        'guards a disclosure and a redraft edits nothing.');
+    }
+    const fired = parseFloat(row.fired);
+    if (!(fired > 0) || !row.sample) {
+      throw new Error(CALIBRATION_FILE + ': "' + id + '" is suppressed with no ' +
+        'evidence. Rule 1 wants a fired: count over 0 and the sample: that did ' +
+        'it, from gate --negative. A hand-edited suppression is a rule switched ' +
+        'off because it was inconvenient rather than because it was wrong.');
+    }
+    evidence.push({ rule: id, fired, sample: String(row.sample), note: row.note || null });
+  }
+  // The baselines block. frontMatter in its bare mode reads a run of key: value
+  // lines and stops at the blank line before the next heading, which is exactly
+  // this section's shape, so there is no third parser here either.
+  const tail = body.split(/^##[ \t]+baselines[ \t]*$/mi)[1] || '';
+  const baselines = {};
+  for (const [k, v] of Object.entries(frontMatter(tail))) {
+    const n = parseFloat(v);
+    if (!isNaN(n)) baselines[k] = n;
+  }
+  return {
+    suppressed: evidence.map(e => e.rule),
+    evidence,
+    baselines,
+    measured_at: meta.measured_at || null,
+    samples: meta.samples ? parseFloat(meta.samples) : null,
+  };
+}
+
+function readCalibration(profile) {
+  const empty = { suppressed: [], evidence: [], baselines: {}, measured_at: null, samples: null };
+  if (!profile) {
+    return { file: 'no profile directory was passed', ...empty,
+      note: 'no calibration was read, so every rule fires. This is not a clean pass.' };
+  }
+  const p = path.join(profile, CALIBRATION_FILE);
+  if (!fs.existsSync(p)) {
+    return { file: 'absent', ...empty,
+      note: 'rule 2: an absent gate-calibration.md means every rule fires. It is not a clean pass, and it is not a suppression of anything.' };
+  }
+  return { file: 'found', ...parseCalibration(readFile(p)) };
 }
 
 // The usable inventory pool. Section 7: append-only, so exclusion is by
@@ -603,7 +809,12 @@ function scan(text, term, tag) {
 
 // Takes text rather than a path, because `gate` scans a fixture corpus and a
 // profile's pasted samples, and neither has a run directory to hold brief.md.
+//
+// opts.calibration is the profile's gate-calibration.md, or absent. Absent
+// suppresses nothing, per rule 2: every caller that does not pass one gets the
+// whole rule set, which is the answer a mistake has to land on.
 function lexicalText(draft, opts, privateTerms, briefFound) {
+  const cal = opts.calibration || null;
   const quotes = quotedRanges(draft);
   const hits = [];
 
@@ -689,33 +900,60 @@ function lexicalText(draft, opts, privateTerms, briefFound) {
     }
   }
 
-  for (const h of hits) h.protected = inQuote(quotes, h.at);
+  // Every hit carries its tell id and its class from the table. Section 9's
+  // split is the whole point of the inversion: a repair swaps a token and a
+  // redraft goes back to brief.md, and a hit that cannot say which one it is
+  // gets whichever the caller assumes.
+  for (const h of hits) {
+    h.protected = inQuote(quotes, h.at);
+    const tell = tellByTag.get(h.tag);
+    h.tell = tell ? tell.id : null;
+    h.action = tell ? tell.action : 'rewrite';
+  }
   hits.sort((a, b) => a.at - b.at);
-  const rewritable = hits.filter(h => !h.protected);
-  const protectedHits = hits.filter(h => h.protected);
 
-  // A hashtag stack is one rewrite. Section 9 bound 2's "substitute, never
-  // subtract" is scoped to lexical tells, so deleting the stack is the fix
+  // gate-calibration.md. A suppressed rule does not fire, and it is reported
+  // rather than dropped, per rule 3: a rule that vanishes from the output is
+  // indistinguishable from a rule that passed.
+  const suppressed = hits.filter(h => isSuppressed(cal, h.tell));
+  const live = hits.filter(h => !isSuppressed(cal, h.tell));
+  const scanned = live.filter(h => !h.protected);
+  const rewritable = scanned.filter(h => h.action === 'rewrite');
+  const redraftable = scanned.filter(h => h.action === 'redraft');
+  const protectedHits = live.filter(h => h.protected);
+
+  // A hashtag stack is one repair. Section 9 bound 2's "substitute, never
+  // subtract" is scoped to the substitutions, so deleting the stack is the fix
   // rather than a defect in the fix. Counting it here is what lets bound 3's
   // cap see it, and what stops `action` reporting 'none' on a draft this same
   // object has already marked failed.
-  const stack = hashtags.length >= HASHTAG_STACK;
+  const stack = hashtags.length >= HASHTAG_STACK && !isSuppressed(cal, 'hashtag-stack');
 
   return {
     check: 'lexical',
-    pass: rewritable.length === 0 && !stack && privateHits.length === 0,
+    pass: rewritable.length === 0 && redraftable.length === 0 && !stack &&
+      privateHits.length === 0,
     format: opts.short ? 'short' : 'any',
-    action: privateHits.length ? 'reject' : ((rewritable.length || stack) ? 'rewrite' : 'none'),
+    // Precedence, highest first, the same order gate --report prints.
+    action: privateHits.length ? 'reject'
+      : (redraftable.length ? 'redraft' : ((rewritable.length || stack) ? 'rewrite' : 'none')),
+    // The cap's operand. Repairs only: a redraft is not budgeted, it happens
+    // once, so counting one here would spend a repair allowance on it.
     rewrite_count: rewritable.length + (stack ? 1 : 0),
-    hits: rewritable,
+    redraft_count: redraftable.length,
+    // Ids rather than tags, because the redraft injects them as drafting
+    // constraints and ai-tells.md is read per id.
+    redraft_tells: [...new Set(redraftable.map(h => h.tell))].sort(),
+    hits: scanned,
     not_rewritten_quoted_or_factual: protectedHits,
+    suppressed_by_calibration: suppressed.map(h => ({ tell: h.tell, at: h.at, match: h.match })),
     hashtags: { count: hashtags.length, stack },
     private_terms: {
       // "checked: 0" reads as "nothing to guard". Say which one it was.
       brief: briefFound ? 'found' : 'missing',
       checked: privateTerms.length,
       violations: privateHits,
-      note: 'a private_terms hit is a redraft, not a rewrite. Section 9.',
+      note: 'a private_terms hit is a rejection, never a repair, and it is never suppressible. Section 9, and gate-calibration.md rule 4.',
     },
   };
 }
@@ -786,6 +1024,25 @@ function paragraphLines(text) {
     .filter(n => n > 0);
 }
 
+// Section 9's punctuation density counts exactly the four marks it names:
+// commas, semicolons, parentheses and dashes. Not colons, not question marks.
+// A hyphen counts only when it is standing in for a dash, which is a hyphen
+// with a space on both sides; inside a compound it is spelling, not clause
+// structure.
+function punctuationMarks(text) {
+  const re = new RegExp('[,;()]|' + EM_DASH + '|' + EN_DASH + '|(?<= )-(?= )', 'g');
+  return (text.match(re) || []).length;
+}
+
+// ponytail: a word of six letters or more ending in one of section 9's six
+// suffixes. Six is what keeps "city" and "unity" out of the count. The ceiling
+// is that "moment" and "entity" are in it, which is a rate error rather than a
+// census error, and section 9 only ever asks whether the rate is inflated.
+const NOMINAL_SUFFIX = /(?:tion|ment|ness|ity|ance|ence)s?$/;
+function nominalisations(tokens) {
+  return tokens.filter(t => t.length >= 6 && NOMINAL_SUFFIX.test(t)).length;
+}
+
 function measure(text) {
   const ss = sentences(text);
   const lengths = ss.map(s => words(s).length).filter(n => n > 0);
@@ -798,6 +1055,13 @@ function measure(text) {
     sentence_length_stdev: round(stdev(lengths), 2),
     contraction_rate: total ? round((contractionCount(tokens) / total) * 100, 2) : 0,
     comma_density: total ? round(((text.match(/,/g) || []).length / total) * 100, 2) : 0,
+    // Section 9's three Phase 2 counts. Burstiness is the coefficient of
+    // variation of sentence length, which is stdev over mean and therefore one
+    // division on numbers this function already had.
+    burstiness: lengths.length > 1 && total
+      ? round(stdev(lengths) / (total / lengths.length), 3) : 0,
+    punctuation_density: total ? round((punctuationMarks(text) / total) * 100, 2) : 0,
+    nominalisation_rate: total ? round((nominalisations(tokens) / total) * 100, 2) : 0,
     specifics: countSpecifics(text),
     proper_nouns: capitalizedMid(text),
     first_person_plural: (text.match(/\b(?:we|us|our|ours|we['\u2019]re|we['\u2019]ve)\b/gi) || []).length,
@@ -808,15 +1072,23 @@ function measure(text) {
 }
 
 // Takes text and an already-read baseline, for the same reason lexicalText
-// does: `gate` measures a corpus, not a run directory.
-function statsText(text, baseline) {
+// does: `gate` measures a corpus, not a run directory. `cal` is the profile's
+// gate-calibration.md, or absent, and absent suppresses nothing.
+//
+// Every action here is read out of the tell table rather than written in as a
+// literal, so section 9's classes live in exactly one place. Nothing in this
+// function is repair-class, and that is not an omission: an absence, a
+// distribution and a distance from a baseline are all properties of the whole
+// draft, and there is no span to swap a token in. That is the whole reason
+// section 9 lists all of them under redraft.
+function statsText(text, baseline, cal) {
   const m = measure(text);
   const flags = [];
 
   // Section 9's specifics floor. A draft naming nothing is redrafted, not
   // rewritten: an abstraction cannot be patched into an instance.
   if (m.specifics === 0) {
-    flags.push({ rule: 'specifics-floor', action: 'redraft', detail: 'no named people, companies, dates, or numerals' });
+    flags.push({ rule: 'specifics-floor', action: actionOf('specifics-floor'), detail: 'no named people, companies, dates, or numerals' });
   }
 
   // Section 9: every paragraph the same number of lines.
@@ -824,7 +1096,7 @@ function statsText(text, baseline) {
   if (pl.length >= UNIFORM_PARA_MIN && pl[0] >= UNIFORM_PARA_LINES &&
       pl.every(n => n === pl[0])) {
     flags.push({
-      rule: 'uniform-paragraphs', action: 'rewrite',
+      rule: 'uniform-paragraphs', action: actionOf('uniform-paragraphs'),
       detail: pl.length + ' paragraphs of ' + pl[0] + ' lines each',
     });
   }
@@ -839,7 +1111,7 @@ function statsText(text, baseline) {
   // reads the rest.
   if (m.first_person_plural > 0 && m.proper_nouns === 0) {
     flags.push({
-      rule: 'we-with-no-human', action: 'rewrite',
+      rule: 'we-with-no-human', action: actionOf('we-with-no-human'),
       detail: m.first_person_plural + ' first-person-plural uses and nobody named',
     });
   }
@@ -851,7 +1123,7 @@ function statsText(text, baseline) {
       if (b === null || b === 0) continue;
       if (m[key] < b * VOICE_FLOOR) {
         flags.push({
-          rule: 'voice-floor', action: 'flag', metric: key,
+          rule: 'voice-floor', action: actionOf('voice-floor'), metric: key,
           draft: m[key], baseline: b, floor: round(b * VOICE_FLOOR, 2),
         });
       }
@@ -864,7 +1136,7 @@ function statsText(text, baseline) {
   if (m.contraction_rate === 0 && m.words >= CONTRACTION_FLOOR_WORDS &&
       !(baseline && baseline.contraction_rate === 0)) {
     flags.push({
-      rule: 'zero-contractions', action: 'rewrite',
+      rule: 'zero-contractions', action: actionOf('zero-contractions'),
       detail: 'no contraction in ' + m.words + ' words',
       override_available: baseline ? 'voice.md records ' + baseline.contraction_rate : 'no baseline on file',
     });
@@ -874,28 +1146,85 @@ function statsText(text, baseline) {
   if (!haveBaseline) {
     // Section 9's fallback where no samples exist.
     if (m.sentences && m.shortest_sentence >= 6) {
-      flags.push({ rule: 'no-fragments', action: 'flag', detail: 'no sentence under 6 words' });
+      flags.push({ rule: 'no-fragments', action: actionOf('no-fragments'), detail: 'no sentence under 6 words' });
     }
     if (m.sentences && m.longest_sentence <= 25) {
-      flags.push({ rule: 'no-long-sentence', action: 'flag', detail: 'no sentence over 25 words' });
+      flags.push({ rule: 'no-long-sentence', action: actionOf('no-long-sentence'), detail: 'no sentence over 25 words' });
     }
   }
 
+  // Section 9's three Phase 2 checks, floored against gate-calibration.md's
+  // baseline for this person with an absolute fallback where no baseline
+  // exists, which is the pattern the voice floor above already implements.
+  //
+  // "Floored" in section 9 means measured against this person rather than
+  // against a constant, and the *direction* is per metric because the drift is
+  // per metric: burstiness and punctuation density flatten downward and
+  // nominalisation inflates upward. A floor on nominalisation would be a check
+  // that cannot fire on the text it was written to catch.
+  //
+  // Punctuation density was blocked, and what unblocked it was not a
+  // retirement. A density floor cannot bind while two of its four inputs are
+  // banned at zero tolerance *globally*, which is what the old plan assumed and
+  // is why this check was scheduled after a global strike of the em dash and the
+  // semicolon. Under gate-calibration.md nothing is struck globally: the floor
+  // is measured against the person's own baseline, and if the em dash or the
+  // semicolon is suppressed for them then the mark is theirs to use and the
+  // density it produces is theirs to be measured against. The contradiction was
+  // never in the two rules. It was in retiring them for everybody.
+  //
+  // All three need enough text to be a distribution, per DIST_MIN_*.
+  const bl = (cal && cal.baselines) || {};
+  if (m.words >= DIST_MIN_WORDS && m.sentences >= DIST_MIN_SENTENCES) {
+    const band = (rule, metric, absolute, over) => {
+      const raw = bl[metric];
+      const b = typeof raw === 'number' && raw > 0 ? raw : null;
+      const limit = b === null ? absolute
+        : round(over ? b / VOICE_FLOOR : b * VOICE_FLOOR, 3);
+      if (over ? m[metric] > limit : m[metric] < limit) {
+        flags.push({
+          rule, action: actionOf(rule), metric,
+          draft: m[metric], baseline: b, limit,
+          direction: over ? 'above' : 'below',
+          source: b === null
+            ? 'absolute fallback, gate-calibration.md carries no baseline for this metric'
+            : 'gate-calibration.md',
+        });
+      }
+    };
+    band('burstiness', 'burstiness', BURSTINESS_FLOOR, false);
+    band('punctuation-density', 'punctuation_density', PUNCT_DENSITY_FLOOR, false);
+    band('nominalisation-rate', 'nominalisation_rate', NOMINALISATION_CEILING, true);
+  }
+
+  // gate-calibration.md rule 4, at the one place every rule leaves this
+  // function. Nothing here is rewrite-class, so `suppressible` refuses all of
+  // them and this filter is provably empty today; it is the enforcement point
+  // if a rule ever changes class, and the thing that decides is the table,
+  // never the file.
+  const live = flags.filter(f => !isSuppressed(cal, f.rule));
+
   return {
     check: 'stats',
-    pass: flags.length === 0,
+    pass: live.length === 0,
     measured: m,
     baseline: baseline,
     baseline_source: haveBaseline ? 'voice.md' : 'none, absolute floors applied',
-    flags,
+    // The voice floor keeps reading voice.md's frozen four and not this file.
+    // voice.md is frozen at setup and gate-calibration.md is re-measured, so
+    // drift is only detectable against the first one. The calibration baselines
+    // serve the three checks above, which voice.md has no keys for.
+    distribution_baselines: bl,
+    flags: live,
+    suppressed_by_calibration: flags.filter(f => isSuppressed(cal, f.rule)).map(f => f.rule),
   };
 }
 
-function stats(draftPath, profile) {
+function stats(draftPath, profile, cal) {
   const baseline = profile
     ? voiceMeasures(readIfPresent(path.join(profile, 'voice.md')))
     : null;
-  return statsText(readFile(draftPath), baseline);
+  return statsText(readFile(draftPath), baseline, cal || readCalibration(profile));
 }
 
 // -------------------------------------------------------------------- locks
@@ -986,11 +1315,9 @@ function locks(profile) {
 // because a fixture happens to list it would report a number this file did not
 // earn, which is the self-witnessing problem section 13.1 exists to stop.
 
-const tellById = new Map(TELLS.map(x => [x.id, x]));
-
-function firedTags(text, baseline, short) {
-  const lx = lexicalText(text, { short: short !== false }, [], false);
-  const st = statsText(text, baseline);
+function firedTags(text, baseline, short, cal) {
+  const lx = lexicalText(text, { short: short !== false, calibration: cal }, [], false);
+  const st = statsText(text, baseline, cal);
   const tags = new Set();
   for (const h of lx.hits) tags.add(h.tag);
   if (lx.hashtags.stack) tags.add('hashtag-stack');
@@ -998,7 +1325,14 @@ function firedTags(text, baseline, short) {
   return { tags: [...tags], rewrite_count: lx.rewrite_count, protected: lx.not_rewritten_quoted_or_factual.length };
 }
 
-function gateFixtures(dir) {
+// `profile` is optional and it changes what the number means, not how it is
+// computed. gate-calibration.md rule 3: recall measured over a suppressed rule
+// is a number the engine did not earn, so a suppressed expectation leaves the
+// scored set and is named under recall_not_earned instead of quietly counting
+// as a catch or quietly counting as a miss. With no profile, nothing is
+// suppressed and this is the corpus-wide recall it has always been.
+function gateFixtures(dir, profile) {
+  const cal = readCalibration(profile);
   // Rows are `NN: tell-id, tell-id  # why`. The expected catch lives in one
   // manifest rather than in each fixture's front matter, so a fixture file is
   // only ever the post: authors stripped means nothing else in there either.
@@ -1015,31 +1349,36 @@ function gateFixtures(dir) {
     : [];
   const errors = [];
   const per = [];
+  const suppressedSeen = [];
   let owed = 0;
   let caught = 0;
 
   for (const f of files) {
     const want = expected.get(f.slice(0, 2));
     if (!want) { errors.push(f + ': no row in expected.md'); continue; }
-    const got = firedTags(readFile(path.join(dir, f)), null, true);
+    const got = firedTags(readFile(path.join(dir, f)), null, true, cal);
     const wantTags = new Set();
     const engineWanted = [];
     const judged = [];
     const missed = [];
+    const notEarned = [];
     for (const id of want) {
       const tell = tellById.get(id);
       if (!tell) { errors.push(f + ': unknown tell "' + id + '"'); continue; }
       if (!tell.tag) { judged.push(id); continue; }
+      if (isSuppressed(cal, id)) { notEarned.push(id); wantTags.add(tell.tag); continue; }
       wantTags.add(tell.tag);
       engineWanted.push(id);
       if (!got.tags.includes(tell.tag)) missed.push(id);
     }
     owed += engineWanted.length;
     caught += engineWanted.length - missed.length;
+    for (const id of notEarned) if (!suppressedSeen.includes(id)) suppressedSeen.push(id);
     per.push({
       fixture: f,
       expected_engine: engineWanted,
       expected_judged: judged,
+      expected_suppressed: notEarned,
       missed,
       also_fired: got.tags.filter(x => !wantTags.has(x)),
     });
@@ -1058,13 +1397,27 @@ function gateFixtures(dir) {
     deterministic_expected: owed,
     deterministic_caught: caught,
     judged_expected: per.reduce((n, r) => n + r.expected_judged.length, 0),
+    calibration: cal.file,
+    suppressed_for_profile: cal.suppressed,
+    recall_not_earned: suppressedSeen,
     errors,
     per_fixture: per,
-    note: 'a judged tell is the model half of section 9 and is listed, never scored.',
+    note: 'a judged tell is the model half of section 9 and is listed, never scored. A tell suppressed for this profile is listed under recall_not_earned and is not scored either, per gate-calibration.md rule 3: recall over a rule that cannot fire is a number the engine did not earn.',
   };
 }
 
+// The negative control, and the producer of the evidence gate-calibration.md is
+// written from. It stays a pure read: setup and /content-engine review write
+// that file, and section 1.3's write constraint is that every write lands
+// inside profiles/<handle>/ by the half of the system that owns writing.
+//
+// It runs with every rule on, always, including rules already suppressed for
+// this profile. A control that applied the suppressions could never re-confirm
+// one, and a suppression nobody can re-measure is a rule switched off forever on
+// evidence nobody can see again. Already-suppressed fires are reported and do
+// not fail the control, because a suppressed rule edits nothing.
 function gateNegative(profile) {
+  const cal = readCalibration(profile);
   const voiceText = readIfPresent(path.join(profile, 'voice.md'));
   const baseline = voiceMeasures(voiceText);
   const corpus = voiceSamples(voiceText).map(s => ({ from: 'voice.md', ...s }))
@@ -1080,6 +1433,38 @@ function gateNegative(profile) {
   // floor is a flag; neither edits a word the person wrote, and neither is
   // evidence that a rule is wrong. Only rewrites count against the control, and
   // the rest is reported so it stays visible.
+  // A sample needs a name a suppression can be traced back to. voice.md's lead
+  // key is `source:` and voiceSamples keeps only the ones labelled `pasted`, so
+  // every voice.md label is the literal string "pasted" and five samples would
+  // name themselves identically. shipped-history.md's lead key is `posted_at:`,
+  // which is a real label already. So: the declared kind plus its ordinal
+  // within the file for voice.md, the date for shipped-history.md, and an
+  // ordinal on either if two collide. Evidence that cannot be traced back to
+  // one sample is not evidence, which is gate-calibration.md rule 1.
+  const used = new Map();
+  const nameOf = s => {
+    const base = s.from === 'shipped-history.md'
+      ? (s.label || 'undated')
+      : (s.kind ? s.kind.trim().replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') : 'sample');
+    const key = s.from + '/' + base;
+    const n = (used.get(key) || 0) + 1;
+    used.set(key, n);
+    return s.from + ':' + base + (s.from === 'shipped-history.md' && n === 1 ? '' : '-' + n);
+  };
+
+  // Per rule, the count and the first sample that produced it: the two things
+  // gate-calibration.md rule 1 asks for. "Your own writing tripped this 36
+  // times" is the argument for a suppression, and "it tripped at least once"
+  // is not, so this is a count and not a set.
+  const candidates = new Map();
+  const candidate = (rule, sample) => {
+    if (!suppressible(rule)) return;
+    const c = candidates.get(rule) || { rule, fired: 0, sample, samples: 0 };
+    c.fired++;
+    if (c.last !== sample) { c.samples++; c.last = sample; }
+    candidates.set(rule, c);
+  };
+
   const fires = [];
   const flagged = [];
   for (const s of corpus) {
@@ -1088,13 +1473,30 @@ function gateNegative(profile) {
     // message is not scanned for them. Firing there would strike a live rule
     // over a sample the rule never claimed.
     const lx = lexicalText(s.text, { short: isPost }, [], false);
-    const name = s.from + (s.label ? ':' + s.label : '');
+    const name = nameOf(s);
+    const counts = {};
+    for (const h of lx.hits) {
+      counts[h.tell || h.tag] = (counts[h.tell || h.tag] || 0) + 1;
+      candidate(h.tell, name);
+    }
+    if (lx.hashtags.stack) {
+      counts['hashtag-stack'] = 1;
+      candidate('hashtag-stack', name);
+    }
     if (lx.rewrite_count > 0 || lx.hashtags.stack) {
+      const rules = [...new Set(lx.hits.filter(h => h.action === 'rewrite').map(h => h.tell))]
+        .concat(lx.hashtags.stack ? ['hashtag-stack'] : []);
+      const live = rules.filter(r => !isSuppressed(cal, r));
       fires.push({
         sample: name,
         kind: s.kind || 'unspecified',
         fired: [...new Set(lx.hits.map(h => h.tag))],
+        counts,
         rewrites: lx.rewrite_count,
+        rewrite_rules: rules,
+        // Already off for this profile, so it edits nothing and fails nothing.
+        already_suppressed: rules.filter(r => isSuppressed(cal, r)),
+        blocking: live.length > 0,
       });
     }
     // The absence checks measure a whole post: paragraph uniformity, a
@@ -1102,14 +1504,36 @@ function gateNegative(profile) {
     // is not a post and running them on one measures the sample rather than
     // the rule.
     if (!isPost) continue;
-    for (const f of statsText(s.text, baseline).flags) {
+    for (const f of statsText(s.text, baseline, cal).flags) {
       if (f.action === 'rewrite') {
-        fires.push({ sample: name, kind: s.kind, fired: [f.rule], rewrites: 1 });
+        candidate(f.rule, name);
+        fires.push({
+          sample: name, kind: s.kind, fired: [f.rule], counts: { [f.rule]: 1 },
+          rewrites: 1, rewrite_rules: [f.rule],
+          already_suppressed: isSuppressed(cal, f.rule) ? [f.rule] : [],
+          blocking: !isSuppressed(cal, f.rule),
+        });
       } else {
         flagged.push({ sample: name, rule: f.rule, action: f.action });
       }
     }
   }
+
+  // The four baselines gate-calibration.md records, measured over the corpus as
+  // one body of text rather than per sample, because a coefficient of variation
+  // over the three sentences of one slack message is noise. Two of the four keys
+  // also exist in voice.md, frozen at setup, and those are the authority for the
+  // voice floor; these are what the three distribution checks measure against.
+  const joined = corpus.map(s => s.text).join('\n\n');
+  const jm = measure(joined);
+  const baselines = corpus.length ? {
+    burstiness: jm.burstiness,
+    punctuation_density: jm.punctuation_density,
+    contraction_rate: jm.contraction_rate,
+    sentence_length_stdev: jm.sentence_length_stdev,
+  } : {};
+
+  for (const c of candidates.values()) delete c.last;
 
   return {
     check: 'gate',
@@ -1118,11 +1542,24 @@ function gateNegative(profile) {
     corpus: corpus.length ? 'present' : 'empty, no pasted sample on file',
     samples: corpus.length,
     posts: corpus.filter(s => s.kind === 'linkedin post').length,
-    pass: corpus.length > 0 && fires.length === 0,
+    pass: corpus.length > 0 && !fires.some(f => f.blocking),
     fires,
     also_flagged: flagged,
-    baseline,
-    bar: 'section 13.2 step 4: zero rewrites on the person\'s own samples. Every rewrite is a rule bug, struck per section 9, not a prose bug. A redraft or a flag is listed under also_flagged and does not fail the control, because neither edits a word the person wrote.',
+    // The frozen four from voice.md, plus the two keys the distribution checks
+    // need and voice.md has no field for, so setup writes gate-calibration.md
+    // from one call and invents no key of its own.
+    baseline: { ...baseline, burstiness: corpus.length ? jm.burstiness : null,
+      punctuation_density: corpus.length ? jm.punctuation_density : null },
+    // What a calibration file is written from. Nothing here writes it.
+    calibration: {
+      file: cal.file,
+      suppressed: cal.suppressed,
+      candidates: [...candidates.values()].sort((a, b) => b.fired - a.fired),
+      baselines,
+      writes: 'nothing. This mode is a pure read. Setup and /content-engine review write profiles/<handle>/gate-calibration.md from these numbers, per section 1.3: every write lands inside profiles/<handle>/ and the engine is not the half that writes.',
+      note: 'rule 1: a candidate is a rewrite-class rule with a fired count over 0 and the sample that did it. rule 4: a reject or a redraft is never a candidate, so it never appears here however often it fires.',
+    },
+    bar: 'section 13.2 step 4: zero rewrites on the person\'s own samples. Every rewrite is a rule bug, suppressed for this profile in gate-calibration.md rather than struck in ai-tells.md, because ai-tells.md ships identical to everyone. A redraft or a flag is listed under also_flagged and does not fail the control, because neither edits a word the person wrote. A rewrite whose rule is already suppressed here is reported with blocking: false for the same reason.',
     reads: 'voice.md source: pasted blocks and shipped-history.md. Absence checks run on kind: linkedin post only. The inspiration corpus is not here: section 6 discards that text at the end of setup, so its half of the control runs once, at setup, before the discard.',
   };
 }
@@ -1171,7 +1608,8 @@ function gateHooks(file) {
     // here, only the presence tells are.
     const real = got.tags.filter(x => !['specifics-floor', 'no-fragments',
       'no-long-sentence', 'zero-contractions', 'we-with-no-human',
-      'uniform-paragraphs'].includes(x));
+      'uniform-paragraphs', 'burstiness', 'punctuation-density',
+      'nominalisation-rate'].includes(x));
     if (real.length) violations.push({ line: ex.line, text: body, fired: real });
   });
   return {
@@ -1205,8 +1643,9 @@ function gateReport(draftPath, profile, format) {
   // is short-post only, and a typo that silently widened the format would
   // retire a live rule without anyone asking for it.
   const fmt = format === 'long' ? 'long' : 'short';
-  const lx = lexical(draftPath, { short: fmt === 'short' });
-  const st = stats(draftPath, profile ? profile : null);
+  const cal = readCalibration(profile || null);
+  const lx = lexical(draftPath, { short: fmt === 'short', calibration: cal });
+  const st = stats(draftPath, profile ? profile : null, cal);
 
   // Section 3's only hard fail. With no profile there is no prior corpus, so
   // the block says it did not run and carries no verdict at all: a check that
@@ -1243,8 +1682,16 @@ function gateReport(draftPath, profile, format) {
   // repetition, and it discloses nothing, so it is neither a rewrite nor a
   // rejection. Overlap *warnings* are the spans section 13.1 traces back to
   // inventory or thesis.md, and those are citations: they never fail anything.
-  const redraft = st.flags.some(f => f.action === 'redraft') || overlapFails;
+  const redraft = st.flags.some(f => f.action === 'redraft') ||
+    lx.redraft_count > 0 || overlapFails;
+  // Repairs, and only repairs. The stats term is empty by construction today,
+  // because nothing statsText emits is repair-class; it stays so a rule that
+  // changes class cannot silently stop being counted against the cap.
   const rewrites = lx.rewrite_count + st.flags.filter(f => f.action === 'rewrite').length;
+  const constraints = [...new Set([
+    ...lx.redraft_tells,
+    ...st.flags.filter(f => f.action === 'redraft').map(f => f.rule),
+  ])].sort();
   const reject = lx.private_terms.violations.length > 0;
   const flagged = st.flags.filter(f => f.action === 'flag').length;
 
@@ -1265,6 +1712,11 @@ function gateReport(draftPath, profile, format) {
     rewrites_required: rewrites,
     rewrite_cap: cap,
     over_cap: rewrites > cap,
+    // Section 9's redraft class. These are the ids the single redraft carries
+    // back to brief.md as drafting constraints, and there is no span-patching
+    // path for any of them. Ids rather than tags, because ai-tells.md is read
+    // per id and the redraft prompt quotes it.
+    redraft_constraints: constraints,
     flagged,
     words,
     format: fmt,
@@ -1278,7 +1730,71 @@ function gateReport(draftPath, profile, format) {
     stats: st,
     overlap: ov,
     model_owned: TELLS.filter(x => !x.tag).map(x => x.id),
-    note: 'gate_catch_count and tags are engine-owned tells only. over_cap true is section 9 bound 3: return to brief.md and redraft once with the tripped rules as constraints. Lock 5 is reported under overlap and is counted nowhere else, so read that block rather than the tag list for it.',
+    // gate-calibration.md rule 3: a suppressed rule is reported, never silent.
+    // Named here even when the list is empty, because "nothing was suppressed"
+    // and "no calibration was read" are different states and only one of them
+    // is a clean pass.
+    calibration: {
+      file: cal.file,
+      suppressed: cal.suppressed,
+      evidence: cal.evidence,
+      baselines: cal.baselines,
+      measured_at: cal.measured_at,
+      note: cal.note || 'these rules did not fire on this draft because they are suppressed for this profile, on the evidence above. They are not retired: reference/ai-tells.md ships identical to everyone with every rule on.',
+    },
+    note: 'gate_catch_count and tags are engine-owned tells only. rewrites_required is repairs, which is all the editing section 9 leaves, and over_cap true is bound 3: return to brief.md and redraft once with redraft_constraints as the constraints. The redraft happens once; if it still trips, gate --compare picks which of the two ships. Lock 5 is reported under overlap and is counted nowhere else, so read that block rather than the tag list for it.',
+  };
+}
+
+// Section 9 bound 3's comparator, and the reason it is here rather than left to
+// the model: a comparison performed by adding two JSON arrays is exactly the
+// self-witnessed number section 13.1 exists to stop. The redraft happens once.
+// If it still trips, both drafts are re-measured, the better one ships, and the
+// run prints one line naming what is unresolved. No run ends without an
+// artifact.
+//
+// Fewer catches wins. A tie breaks on distance from the voice floor, summed as
+// a relative shortfall across whichever metrics tripped, because the absolute
+// numbers are a stdev and a percentage and adding those together compares
+// nothing. A total tie ships the first draft: the redraft was composed under
+// constraints and did not measurably improve on it, so there is nothing to
+// prefer it for, and the draft the gate did not touch carries no unproven
+// change.
+function voiceFloorDistance(report) {
+  let d = 0;
+  for (const f of report.stats.flags) {
+    if (f.rule !== 'voice-floor') continue;
+    const floor = f.floor || f.limit || 0;
+    if (floor > 0) d += Math.max(0, (floor - f.draft) / floor);
+  }
+  return round(d, 4);
+}
+
+function gateCompare(firstPath, redraftPath, profile, format) {
+  const a = gateReport(firstPath, profile, format);
+  const b = gateReport(redraftPath, profile, format);
+  const da = voiceFloorDistance(a);
+  const db = voiceFloorDistance(b);
+  const better = b.gate_catch_count < a.gate_catch_count ||
+    (b.gate_catch_count === a.gate_catch_count && db < da);
+  const ships = better ? 'redraft' : 'first';
+  const won = better ? b : a;
+  return {
+    check: 'gate', mode: 'compare',
+    ships,
+    // The line section 9 asks the run to print. Tags rather than counts,
+    // because the human is being told what is still wrong with what shipped.
+    unresolved: won.tags,
+    // Lock 5 has no tell id, so it cannot enter a tag list. Section 3 calls it
+    // a hard fail, and a hard fail that ships has to say so on its own line.
+    unresolved_overlap: won.overlap.ran === true && won.overlap.pass === false,
+    artifact: true,
+    comparator: 'fewer catches wins; a tie breaks on distance from the voice floor; a total tie ships the first draft',
+    catches: { first: a.gate_catch_count, redraft: b.gate_catch_count },
+    voice_floor_distance: { first: da, redraft: db },
+    first: a,
+    redraft: b,
+    note: 'section 9 bound 3. Both drafts are re-measured here, which is bound 1: this compares two measured drafts and not one measured draft and one assumption. The redraft happens once, so there is no third round and no run ends without an artifact.',
   };
 }
 
@@ -1954,15 +2470,24 @@ function selfTest() {
     assert.strictEqual(rBoth.action, 'reject', 'reject outranks redraft');
     assert.strictEqual(rBoth.gate_catch_count, 2, 'and both are still counted');
 
-    // A stats rewrite is a rewrite. Three paragraphs of two lines each, with
-    // nothing lexical in them, so the count can only have come from stats.
+    // A stats finding is a redraft, not a rewrite. Three paragraphs of two lines
+    // each, with nothing lexical in them, so the catch can only have come from
+    // stats. This block asserted `rewrites_required: 1` and `action: 'rewrite'`
+    // until 2026-08-24, which was the pre-inversion model: uniform paragraphs is
+    // a property of the whole draft, there is no span to patch, and the tell
+    // table now carries it as redraft. The intent of the assert is unchanged and
+    // is now stated more precisely -- a catch with zero repairs proves the
+    // finding came from the stats pass rather than the lexical one.
     const rUniform = rep('Acme shipped 41 units in March.\nIt didn' + APOS + 't hold.\n\n' +
       'The warehouse team checked every pallet against the manifest before the truck ' +
       'left the yard that afternoon and found nothing wrong with any of them at all.\n' +
       'Nobody said anything.\n\nI checked again on Monday.\nThe gap was still there.\n');
     assert.strictEqual(rUniform.lexical.rewrite_count, 0, 'nothing lexical in this draft');
-    assert.strictEqual(rUniform.rewrites_required, 1, 'so the rewrite came from stats');
-    assert.strictEqual(rUniform.action, 'rewrite', 'and it is a rewrite');
+    assert.strictEqual(rUniform.rewrites_required, 0, 'a redraft-class rule repairs nothing');
+    assert.strictEqual(rUniform.gate_catch_count, 1, 'so the catch came from stats');
+    assert.deepStrictEqual(rUniform.tags, ['uniform-paragraphs'], 'and names which stats rule');
+    assert.strictEqual(rUniform.action, 'redraft', 'and it is a redraft, not a rewrite');
+    assert.strictEqual(rUniform.gate_passes, false, 'a redraft is still a failure');
 
     // Bound 3's cap, and the semicolon rule, which is short-post scoped and is
     // therefore the rule the format argument is measured on, two blocks below.
@@ -2186,9 +2711,16 @@ function selfTest() {
     assert.ok(n2.fires.some(f => f.fired.includes('semicolon')),
       'section 9 bans semicolons in short posts, so a post-kind sample is scanned for them');
 
-    // A rewrite-action flag from stats has to fail the control too. Only the
-    // redraft and flag actions are exempt, and reading all of stats as exempt
-    // retires three of section 9's texture rules from the control silently.
+    // Stats findings do not fail the control, and after the 2026-08-24 inversion
+    // that is a property of the tell table rather than a concession. This block
+    // asserted the opposite -- that a rewrite-action flag from stats fails the
+    // control -- on the reasoning that reading all of stats as exempt would
+    // silently retire section 9's texture rules from it. The reasoning was right
+    // and the case it guarded is now unreachable: every rewrite-class rule is
+    // mechanical and lexical, so no stats rule can produce one. The assert below
+    // pins that invariant at the table, which is where it can actually break: add
+    // a rewrite-class rule that statsText produces and this fails loudly instead
+    // of quietly widening what the negative control forgives.
     const neg3 = path.join(root, 'profiles', 'negative3');
     writeFixture(neg3, 'shipped-history.md',
       '- posted_at: 2025-09-01\n  text: |\n' +
@@ -2196,12 +2728,30 @@ function selfTest() {
       '    the deck was ready\n    the decision was not\n\n' +
       '    that was the whole quarter\n    and it repeated in the next one\n');
     const n3 = gateNegative(neg3);
-    assert.ok(n3.fires.some(f => f.fired.includes('uniform-paragraphs')),
-      'a rewrite-action flag fails the control');
-    assert.ok(n3.also_flagged.some(f => f.action === 'flag' || f.action === 'redraft'),
-      'and a flag or redraft is reported without failing it');
+    assert.ok(!n3.fires.some(f => f.fired.includes('uniform-paragraphs')),
+      'uniform paragraphs is redraft-class, so it does not fail the control');
+    assert.ok(n3.also_flagged.some(f => f.rule === 'uniform-paragraphs'),
+      'it is reported instead, because a redraft edits no word they wrote');
     assert.ok(!n3.fires.some(f => f.fired.includes('specifics-floor')),
       'because section 13.2 counts rewrites, and a redraft edits nothing');
+
+    // blockItems: a heading after the last field is not a continuation of it.
+    const bi = blockItems(
+      '## suppressed\n\n- rule: em-dash\n  fired: 36\n  sample: voice.md:2\n\n' +
+      '## baselines\n\nburstiness: 0.71\n', 'rule');
+    assert.strictEqual(bi.length, 1, 'one suppression parsed');
+    assert.strictEqual(bi[0].sample, 'voice.md:2',
+      'a continuation line must be indented, or the next heading lands in the ' +
+      'field and a suppression cites evidence that does not exist');
+
+    // The invariant that makes the three asserts above true rather than lucky.
+    assert.deepStrictEqual(
+      TELLS.filter(t => t.action === 'rewrite').map(t => t.id).sort(),
+      ['banned-lexicon', 'em-dash', 'emoji-bullets', 'en-dash', 'hashtag-stack',
+       'semicolon', 'title-case-header'],
+      'the repair class is exactly section 9\'s mechanical rules: a rule that ' +
+      'cannot restructure a sentence. Adding one here means deciding what it ' +
+      'does to the negative control and to gate-calibration.md suppression');
 
     return {
       check: 'test',
@@ -2236,7 +2786,13 @@ function main(argv) {
     case 'overlap':
       return overlap(need(args[0], 'draft'), need(args[1], 'profile directory'));
     case 'lexical':
-      return lexical(need(args[0], 'draft'), flags);
+      return lexical(need(args[0], 'draft'), {
+        short: flags.short,
+        // A profile is optional here and is what makes a suppression visible to
+        // the per-check command. Without it this command would report a rule
+        // firing that `gate --report` on the same draft says is suppressed.
+        calibration: readCalibration(args[1] ? need(args[1], 'profile directory') : null),
+      });
     case 'stats':
       return stats(need(args[0], 'draft'), args[1] ? need(args[1], 'profile directory') : null);
     case 'locks':
@@ -2247,10 +2803,15 @@ function main(argv) {
         return gateReport(need(args[0], 'draft'), args[1] || null,
           rest.includes('--long') ? 'long' : 'short');
       }
+      if (rest.includes('--compare')) {
+        return gateCompare(need(args[0], 'first draft'), need(args[1], 'redraft'),
+          args[2] || null, rest.includes('--long') ? 'long' : 'short');
+      }
       if (rest.includes('--tells')) return gateTells(args[0] || here('ai-tells.md'));
       if (rest.includes('--hooks')) return gateHooks(args[0] || here('hooks.md'));
       if (rest.includes('--negative')) return gateNegative(need(args[0], 'profile directory'));
-      return gateFixtures(need(args[0] || here('gate-fixtures'), 'fixtures directory'));
+      return gateFixtures(need(args[0] || here('gate-fixtures'), 'fixtures directory'),
+        args[1] || null);
     }
     case 'test':
       return selfTest();
@@ -2265,5 +2826,6 @@ if (require.main === module) {
 
 module.exports = {
   overlap, lexical, stats, locks, measure, selfTest,
-  gateFixtures, gateNegative, gateHooks, gateTells, gateReport, TELLS,
+  gateFixtures, gateNegative, gateHooks, gateTells, gateReport, gateCompare,
+  parseCalibration, readCalibration, TELLS,
 };
