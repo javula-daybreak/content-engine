@@ -19,5 +19,14 @@ Staleness interval: 90 days.
 it gives the engine nothing to argue with. Ask "who disagrees with this, and how
 would they put it?" and record the answer as they said it, not as a strawman.
 
+`last_reviewed:` is a top-level field of this file, one date for the set, stamped
+by `/content-engine review`'s quarterly check. Added 2026-08-23: this file
+declared a 90-day interval and carried no field to stamp, so it could be flagged
+stale and never cleared.
+
+```
+last_reviewed:
+```
+
 ## Theses
 

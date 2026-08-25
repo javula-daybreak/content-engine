@@ -41,5 +41,14 @@ could not answer, and the weekly top-up reads those rows.
 `withdrawn: <date> <reason>` is appended by `/content-engine retract` and
 permanently excludes the item from every draft-time load.
 
+`last_reviewed:` is a top-level field of this file, one date for the set, stamped
+by a completed weekly top-up rather than by the quarterly check. Added
+2026-08-23: this file declared the shortest interval in the system, 30 days, and
+carried no field to stamp, so it went stale a month after setup and stayed there.
+
+```
+last_reviewed:
+```
+
 ## Items
 

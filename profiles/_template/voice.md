@@ -5,6 +5,17 @@ described in adjectives. The language gate defers to this file: a tell that
 contradicts a documented habit here does not fire for this profile, and the gate
 records the override instead of rewriting.
 
+**This is the first file setup fills.** The paste below is the front door, not a
+later step: it is the only negative control the gate has, and without it every
+rule runs untuned against the person's own voice.
+
+Two different mechanisms defer to this person, and neither is the other. The
+habit override above is per draft and reasons from the prose in this file.
+`gate-calibration.md` switches a rule off for this profile entirely, and it is
+written only from what `engine.js gate --negative` measured over the samples
+below. Neither one is ever applied by editing `reference/ai-tells.md`, which
+ships identical to everyone with every rule on.
+
 Staleness interval: 90 days.
 
 ## The four measured values
@@ -41,8 +52,10 @@ with an empty corpus.
 
 Same shape as `shipped-history.md` on purpose. `engine.js gate --negative`
 reads these to measure how often the language gate fires on this person's own
-writing, and zero is the pass bar, so a sample edited on the way in makes that
-number a lie. Paste it wrong rather than paste it tidy.
+writing, and **zero rewrites** is the pass bar — a rewrite edits a word they
+wrote, while a redraft or a flag does not and does not fail the control. A
+sample edited on the way in makes that number a lie. Paste it wrong rather than
+paste it tidy.
 
 ## Habits
 
@@ -58,3 +71,14 @@ opens with: "No samples of your writing on file, this draft is inferred, not
 matched. Paste anything you've written and I'll re-derive." The engine leans on
 `inspiration.md` until 10 posts have shipped, then re-derives voice from what
 performed. It never refuses to draft.
+
+## Provenance
+
+`last_reviewed:` is stamped when the person accepts a re-derivation of the four
+measurements, shown as an explicit diff against the values on file. Reading this
+file never stamps it. Added 2026-08-23: this file declared a 90-day interval and
+carried no field to stamp.
+
+```
+last_reviewed:
+```
