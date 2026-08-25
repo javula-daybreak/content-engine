@@ -30,13 +30,20 @@ Strip `as <handle>` first, then match:
 | `inventory` | `workflows/review.md`, top-up section only |
 | `review` | `workflows/review.md` |
 | `connect` | `workflows/connect.md` |
-| `retract <slug\|item-id>` | section 7 below, no workflow file |
+| `retract <slug\|item-id>` | section 5 below, no workflow file |
 | prose with no command word | match it to a row above, say which row you matched in one line, proceed |
 
 **If the workflow file a run needs is not in the repo, say which file is missing
 and stop.** Do not improvise the format and do not substitute another one. The
 build order is PRD section 13, and a missing file means that step is not built
 yet.
+
+**There is no route for the reader, and adding one is a PRD change rather than a
+guess.** `reference/reader.md` is pipeline step 5b and nothing else: no entry
+point, no argument form, no row above. Every run is graded already, so a `grade`
+command would buy only the case of grading text this engine did not write, and
+that case is a tenth command in PRD section 8's list rather than a row added
+here. Written down so nobody infers the row from the file's existence.
 
 `as <handle>` scopes a single invocation and does not persist. With more than
 one profile installed and no `as`, ask which one before doing anything else.
@@ -49,7 +56,7 @@ If `profiles/` holds nothing but `_template/`, the only valid command is
 
 ## 2. The pipeline
 
-Five of eight steps are the same for every format. The router owns those five.
+Six of nine steps are the same for every format. The router owns those six.
 A format workflow that reimplements one of them is a bug.
 
 | Step | Owner | Short post | Visual |
@@ -59,6 +66,7 @@ A format workflow that reimplements one of them is a bug.
 | 3. Cross into 5 angles, pick one, write brief.md | router | yes | yes |
 | 4. Draft | workflow | paragraphs | slide beats |
 | 5. Language gate, rewrite, diff, report | router | yes | yes |
+| 5b. Reader grade | router | yes | yes |
 | 6. Design gate | workflow | no | yes |
 | 7. Render | workflow | no | yes |
 | 8. Log run, ship keystroke | router | yes | yes |
@@ -113,8 +121,23 @@ Four things may print, in this order, and none of them blocks. Enter proceeds.
 
 Nothing else prints at run start.
 
-Reading a file does not stamp `last_reviewed`. Only a confirmed answer to
-`review`'s quarterly three-question check does.
+Reading a file does not stamp `last_reviewed`. **Corrected 2026-08-23:** this
+read *"only a confirmed answer to `review`'s quarterly three-question check
+does,"* and that check covers `identity.md`, `audience.md` and `thesis.md`. Under
+it `inventory.md` carries the shortest interval in the system, 30 days, and had
+no stamper at all, so it went stale a month after setup and could never be
+cleared. All five intervals now have one:
+
+| File | Interval | Stamped by |
+| :- | :- | :- |
+| `identity.md` | 180 days | the quarterly three questions |
+| `audience.md` | 120 days | the quarterly three questions |
+| `thesis.md` | 90 days | the quarterly three questions |
+| `voice.md` | 90 days | accepting a re-derivation, shown as an explicit diff |
+| `inventory.md` | 30 days | a completed weekly top-up |
+
+`inspiration.md` and `theme.json` never go stale. `workflows/review.md` owns all
+five and is the definition of the quarterly three questions.
 
 ### Step 2: select the anchor and check the locks
 
@@ -205,7 +228,10 @@ nothing, and lock 3 stops binding without saying so.
 ### Step 5: the gate
 
 `reference/ai-tells.md` runs on every draft before the human sees it, including
-the calibration post at the end of setup session 1. It is not advisory: a draft
+the calibration post in setup's front door. **That post is now gated against a
+calibration measured minutes earlier from their own samples**, which is the whole
+point of the paste coming first: the first draft a person ever sees is checked by
+a gate that already knows which of its rules do not apply to them. It is not advisory: a draft
 that fails is rewritten before anyone sees it. Full precedence, bounds, and
 protected spans are in PRD section 9 and in `reference/pipeline/`.
 
@@ -327,6 +353,54 @@ this split exists to prevent.
 That is the mechanical version of "the gate is not advisory": one existence
 check instead of a promise.
 
+### Step 5b: the reader
+
+`reference/reader.md` grades every draft after the gate and before ship. The gate
+asks whether the draft is machine-shaped. The reader asks whether it is any good,
+and it is the only step in this pipeline that asks. A draft can pass
+`gate --report` completely clean and be worthless.
+
+**It is 5b and not 6.** Nothing renumbers. Steps 6, 7 and 8 are cited across the
+PRD, `VISUALS.md` and four workflow files, and renumbering them would not break
+those citations, it would make them resolve silently wrong, which is the failure
+`hook_id:` and PRD section 9's four bounds already refuse by name.
+
+**Spawn a fresh subagent.** It receives three things: `reference/reader.md` from
+its reader section to its anchor questions, the context block rendered per that
+file from `identity.md`, `audience.md` and `thesis.md`, and `runs/<slug>/draft.md`
+as text. It never receives `brief.md`, the angle menu, `gate-report.md`,
+`voice.md`, `ai-tells.md`, the inventory, or any part of this conversation. The
+blindness is the instrument: a grader that knows what you meant grades what you
+meant. The closed list and the failure attached to each excluded file are in
+`reference/reader.md`, not restated here.
+
+The context block is rendered at this step and stored nowhere. Step 1 loaded all
+three sources already, so it costs no read, and a stored copy of three files
+carrying 180, 120 and 90-day staleness intervals drifts against all three.
+
+**It grades and returns. It never rewrites.** The subagent returns one level, L1
+to L4, the quoted particular feedback, and four anchor answers. Write that
+verbatim to `runs/<slug>/reader-report.md`. Three of the four levels are good
+enough to post.
+
+**It does not block.** There is no existence check here and there must not be
+one. Step 5 has one because the gate edits the human; the reader edits nothing,
+so a grade that could stop a run would be the correction's founding defect
+wearing better manners.
+
+**On an L1 the full report prints and the human is offered one redraft.**
+`L1. Redraft from brief.md against the reader's feedback? [y/n]`. `n` proceeds to
+step 8 and ships as written. `y` returns to step 4 once, with the reader's quoted
+failures as drafting constraints and no span patching, then runs steps 5 and 5b
+again; that second grade is final. Both grades print, the engine names which
+graded higher, and **the human picks.** Bound 3's comparator exists because the
+gate must produce an artifact without asking; here two finished drafts and a
+human are both in the room, and a grader that chooses which one ships has started
+rewriting by proxy.
+
+On a visual run the reader is told it is reading a deck's words, cover slide
+first, and **even meter does not apply to slides.** Slides are uniform by design.
+
 ### Step 8: log and ship
 
 Print, in this order, and nothing else:
@@ -342,10 +416,33 @@ question. The visual path prints one field more, in the same position:
 <angle> · <archetype> · <anchor> · <job>
 ```
 
+**The grade joins that block**, on its own line, below the gate line and directly
+above the post; with no gate line it sits directly above the post itself:
+
+```
+reader: L<n> <level name> · <the principle tag and quoted span that set it>
+```
+
+At L4 the clause names what earns it instead. **Unlike the gate line this one
+always prints.** The gate reports exceptions, so silence means nothing happened;
+the reader reports a measurement, and a measurement that prints only when the
+news is bad is an alarm rather than an instrument. An L1 prints its full report
+here too, because L1 is the only level that asks the human to do something.
+
+**This is an addition to the run line, not a conflict with it.** PRD section
+13.2 step 5's *"Nothing else"* is scoped to the short-post run as it stood before
+step 5b existed, and it already admits the gate line by the same route. The list
+grows by one line that always prints; it does not become a dashboard.
+
 **Never show a draft without showing what it was chosen over.** One exemption,
-and it is a decision rather than an oversight: the calibration post at the end
-of setup session 1 shows one draft and no angle menu, because minute 165 of an
-interview is where people quit.
+and it is a decision rather than an oversight: the calibration post in setup's
+front door shows one draft and no angle menu. **Its reason changed 2026-08-23.**
+It read *"because minute 165 of an interview is where people quit"*, and the
+front-door restructure moved that post to roughly minute 10, so the quit risk it
+cited is the thing that restructure deleted. The exemption stands on a better
+reason: at that point the inventory holds two or three items, and a menu of five
+angles crossed off three items is not a choice, it is the same angle written five
+ways.
 
 End every run with `Shipped as written? [y/n]`.
 
@@ -386,11 +483,18 @@ Inside a profile, two zones:
 - **Profile files** are curated: `identity.md`, `inventory.md`,
   `inventory-archive.md`, `voice.md`, `inspiration.md`, `audience.md`,
   `thesis.md`, `theme.json`, `learnings.md`, `shipped-history.md`,
-  `connectors.md`. **Only named commands write to these.** `setup` creates.
-  After that: `inventory` appends to `inventory.md`; `review` appends to
-  `learnings.md` and to `inventory.md` for each cleared harvest candidate;
-  `connect` writes `connectors.md`; `retract` appends a `withdrawn:` line; and
-  the first visual run writes `theme.json` once. Nothing else, ever.
+  `gate-calibration.md`, `connectors.md`. **Only named commands write to these.**
+  `setup` creates. After that: `inventory` appends to `inventory.md`; `review`
+  appends to `learnings.md` and to `inventory.md` for each cleared harvest
+  candidate, and rewrites `gate-calibration.md` on a re-measure; `connect`
+  writes `connectors.md`; `retract` appends a `withdrawn:` line; and the first
+  visual run writes `theme.json` once. Nothing else, ever.
+- **`gate-calibration.md` is the one profile file with no `_template` copy**, and
+  that is deliberate. Absence means nothing is suppressed and every rule fires.
+  An empty template copy would look measured, and a calibration that looks
+  measured but read no corpus is the same false statement as a clean gate report
+  on a draft nobody scanned. It is written from `gate --negative` output and from
+  nothing else: no rule is ever switched off by hand.
 
   **The paste path is the one write a draft run may make**, and it is
   `inventory`'s writer rather than a new one. `post "<pasted material>"` appends
@@ -439,6 +543,9 @@ until the human accepts.
 - **One anchor per piece plus up to four supports.** Only the anchor consumes a
   lock.
 - **The gate is not advisory.** `voice.md` wins where the two disagree.
+- **The reader grades and never rewrites.** An L1 offers a redraft and the human
+  decides. A grader that edits a person's words is the gate's founding defect
+  with better manners.
 - **`voice.md` is never seeded from another person's or a company's voice
   file.** Registers describe a company; `voice.md` describes one human.
 - **Never show a draft without showing what it was chosen over.**
