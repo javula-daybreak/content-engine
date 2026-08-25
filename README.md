@@ -29,14 +29,17 @@ audience.
 /content-engine infographic <topic>      single image
 /content-engine article <topic>          newsletter edition, plus its carousel
 /content-engine as <handle>              scopes one invocation, does not persist
+/content-engine inventory                top-up interview
+/content-engine review                   weekly reconcile, performance, learnings
 /content-engine retract <slug|item-id>   withdraw a fact or a piece
 ```
 
-**Not built yet:** `/content-engine inventory` and `/content-engine review`, both
-of which want `workflows/review.md`. They are advertised in the router and route
-to a file that does not exist, so the router says which file is missing and
-stops. This list was wrong in both directions until 2026-08-20: it promised those
-two and omitted `article`.
+Every command in that list routes to a file that exists, as of 2026-08-23. One
+command is deliberately not listed: `/content-engine connect`. It is never
+offered, and its name appears in exactly one place in the whole system, which is
+a line `review` prints only if the manual paste path turns out not to be keeping
+up. A feature that reads your chat and mail should be typed by someone who went
+looking for it, not advertised to someone who did not.
 
 ## What it will not do
 
@@ -44,6 +47,11 @@ It does not post for you. It does not log in to LinkedIn as you, ever, for
 reading or for writing. It does not run unattended, and it never invents a fact,
 a number, a story, or a credential: everything factual traces to something you
 said in the interview.
+
+It reads no chat and no mail unless you declare an allowlist yourself, one
+channel at a time, and it clears nothing out of that allowlist for publication
+without a keystroke from you per item. It takes no credential to do it and opens
+no session on your behalf.
 
 ## Your profile is yours
 

@@ -1,6 +1,6 @@
 # Content Engine: the correction
 
-**Written 2026-08-19. Status: sections 1 and 2 approved by Joseph. Sections 3, 4, 5 drafted, pending sign-off.**
+**Written 2026-08-19. Status as of 2026-08-23: all five sections approved by Joseph.** Sections 1 and 2 were approved on 2026-08-19; sections 3, 4 and 5 are approved as of today, and the reader, the onboarding inversion and the formats are all being built now. **Decision 4 below is overturned as of today**, and section 2's retirement rule with it.
 
 This file is the working plan for correcting the build toward the goal. It supersedes
 `content-engine-PRD.md`'s §13 build order where the two disagree, and Phase 0.5 folds
@@ -39,6 +39,35 @@ outranks the spec. That precedence is the reason this file exists.
 4. **Profile.** The real setup interview with Joseph. Not a bootstrap from
    `tim-writing-os`. This makes his corpus the instrument that retires gate rules.
 
+   **Overturned 2026-08-23, in its second half only.** The superseded text is the
+   sentence above, kept because the reasoning that produced it is the reason the
+   negative control exists at all, and that part was right: a prediction made from
+   somebody else's corpus is persuasive enough to act on and is not evidence about
+   this person, so only a negative control over his own samples can say whether a
+   rule over-fires on him. What was wrong is what the decision did with that
+   verdict. **Retiring a rule means striking it in `reference/ai-tells.md`, and that
+   file ships to every person who installs the engine.** Striking a rule there
+   because it over-fires on one person's punctuation hardcodes that person's habits
+   into every future install: the mentor at IBM clones the repo in November and
+   inherits a gate with a hole in it, no evidence in front of her, and no way to
+   know the hole is about somebody else. It is a portability defect wearing the
+   costume of a calibration step, and it fails **G5**, handable to anyone, which the
+   review graded D. It also blocked the build behind one person, which is the
+   cheaper of its two problems.
+
+   **The replacement: rules are never retired, they are suppressed per profile.**
+   `ai-tells.md` ships identical to everyone with every rule on. Each person's
+   setup runs the negative control over their own pasted samples and writes
+   `profiles/<handle>/gate-calibration.md`, recording every rule that rewrote a
+   word they wrote, its fire count, and the sample that fired it. The gate reads
+   that file on every run. Absent file means nothing is suppressed and every rule
+   fires; a suppression is reported and never silent; a `reject`-class rule,
+   meaning clearance and private terms, is never suppressible by anyone. PRD §9's
+   suppression rule is the spec and it replaces §9's retirement rule. What follows
+   from it: **his profile is no longer a dependency of building anything**, the
+   first half of this decision stands untouched, and the engine is built and
+   packaged before it is pointed at a person.
+
 ## Two calls, approved 2026-08-19
 
 1. **Vendor the renderers as Python. Delete `package.json`, `package-lock.json`, and
@@ -67,49 +96,84 @@ the voice-floor thresholds.
 
 | Phase | What | Owner | Est | Needs his corpus |
 | :- | :- | :- | :- | :- |
-| 0 | Instruments: fence comment, `format` de-hardcoded, `overlap` wired in | subagent | ~1h | no |
-| 0.5 | PRD structural rewrite, so the spec leads the work rather than trailing it | subagent | ~2h | no |
-| 1a | Paste front door: three to five unedited samples into `voice.md` and `shipped-history.md`, the four measurements frozen off them | **Joseph** | ~10m | it **is** the corpus |
-| 1b | The real interview, session one | **Joseph** | 30-45m | no |
-| 1.3 | `gate --negative profiles/joseph`, the first real run of the negative control | subagent | ~15m | yes, 1a |
-| 2a | Retire what over-fires on his corpus, struck in `ai-tells.md` with the date and the reason | subagent | ~45m | yes, 1.3 |
-| 2b | Invert the mechanism: `action:` on `TELLS`, the cap's new job, the single redraft, the better-of-two comparator | subagent | ~1h | no |
-| 2c | Burstiness and nominalisation | subagent | ~30m | no |
-| 2d | Punctuation density | subagent | ~15m | yes, 2a |
-| 3 | `reference/reader.md`, the grader | subagent | ~1h | no |
+| 0 | Instruments: fence comment, `format` de-hardcoded, `overlap` wired in | subagent | done 08-19 | no |
+| 0.5 | PRD structural rewrite, so the spec leads the work rather than trailing it | subagent | done 08-19 | no |
+| 2a | The suppression layer: setup runs the negative control and writes `profiles/<handle>/gate-calibration.md`, the gate reads it every run, `--report` and `--fixtures` name what it suppressed | subagent | done 08-24 | no |
+| 2b | Invert the mechanism: `action:` on `TELLS`, the cap's new job, the single redraft, the better-of-two comparator | subagent | done 08-24 | no |
+| 2c | All three of §9's new checks: burstiness, nominalisation, punctuation density | subagent | done 08-24 | no |
+| 3 | `reference/reader.md`, the grader | subagent | done 08-23 | no |
 | (pause) | **Checkpoint: Joseph reviews** | Joseph | | |
+| 5 | Vendor both renderers; write `workflows/{infographic,carousel,article}.md` | subagent | done 08-20 | no |
+| 1a | Paste front door: three to five unedited samples into `voice.md` and `shipped-history.md`, the four measurements frozen off them, `gate-calibration.md` written from them | **Joseph** | ~10m | it **is** the corpus |
+| 1b | The real interview, session one | **Joseph** | 30-45m | no |
 | 4 | Deep interview, chunked into 30-45m sessions each ending in a visible improvement, continuing 1b | **Joseph** | async | no |
-| 5 | Vendor both renderers; write `workflows/{infographic,carousel,article}.md` | subagent | ~1d | no |
-| 6 | PRD evidence pass: record which rules died and the measured thresholds | subagent | ~1h | no, but downstream of 2a |
+| 6 | PRD evidence pass: the measured thresholds, and Joseph's calibration recorded as the first one | subagent | ~1h | no |
 
-**Re-cut 2026-08-20.** Phase 1 was one row, *"Paste-first front door, then the real
-interview,"* Joseph, 30-45m, and Phase 2 was one row bundling the retirement, the three
-new checks and the mechanism inversion at ~2h. Both are split above, and the reason is in
-the code. `gateNegative` opens two files, `voice.md` and `shipped-history.md`
-(`reference/engine.js:1067-1071`), and nothing else: not `identity.md`, not `thesis.md`,
-not `audience.md`, not `inventory.md`, not `learnings.md`, every one of which is an
-interview output. So what gates Phase 1.3 is three to five pasted samples and the four
-measurements taken off them. That is ten minutes, not the 30-45 minute interview, and the
-old row charged the interview's clock to a dependency the interview is not in. What the
-old row was right about survives: neither half of Phase 1 can be delegated, because both
-are Joseph talking. Section 2's two `Phase 2` headings are relabelled 2b and 2c/2d to
-match this table, and its density paragraph now names 2a as the retirement row rather
-than 1.3, which is the row the negative control runs in.
+**Status, 2026-08-24.** Every subagent row above is built and its tests are green:
+`engine.js` carries 253 assertions, the two renderers 92 tests between them. Also
+built and not in this table, because they are PRD step numbers rather than
+correction phases: `workflows/review.md` and `workflows/connect.md`, which closed
+the three advertised commands that routed to missing files, and
+`reference/design-tells.md` plus the eleven unbuilt infographic signatures, which
+are the one thing still in flight. **What is left of the engine is the visual
+catalog**, not the writing path.
 
-The right-hand column is the whole corpus dependency and it is deliberately narrow. Four
-rows need Joseph's own words: 1a produces them, 1.3 reads them, 2a spends 1.3's verdict,
-and 2d cannot be specified until 2a has run, for the reason section 2 already gives, that
-a density floor and a zero-tolerance ban on two of its own four inputs cannot both bind.
-Every other row is code against a spec that already exists. 2b is restructuring of
-`TELLS` and the cap and touches no profile. 2c's two checks carry absolute fallbacks for a
-profile with no baseline, which `statsText` already implements for the voice floor
-(`reference/engine.js:873-881`), so both are testable against `gate-fixtures/` before a
-sample is pasted. 1b gates nothing in this build; it buys draft quality, and Phase 4 is
-where that is scheduled.
+**Re-cut 2026-08-23. The engine is built and packaged first, and the interview is the
+last step.** Anything personal, his corpus, his posts, his profile, comes after the
+engine ships rather than as a dependency of building it. Two rows are gone from the
+build because they existed only to consume his corpus. **Phase 1.3, the one run of
+`gate --negative profiles/joseph`, and Phase 2a, retiring what over-fired on him, stop
+being build phases and become features of setup**: one shipped capability, built once at
+the new 2a, run at every install's own 1a and again at every re-measure. Phase 2d merges
+into 2c, because punctuation density was held behind the retirement and there is no
+retirement left to wait for. Every Joseph row moved below Phase 5. The serial chain this
+table was organised around, 1a to 1.3 to 2a to 2d, does not exist any more, and the
+right-hand column now reads `no` on every row that is code.
 
-Phases 4 and 5 run in parallel. Inventory depth gates draft quality, not format support.
-**Revised 2026-08-20:** 1b, 2b, 2c, 3 and 5 all run in parallel with each other too,
-which is what the split is for. The only serial chain left is 1a, 1.3, 2a, 2d.
+**2a keeps its id and changes its content, deliberately.** It was the retirement pass
+and it is the suppression layer. `reference/reader.md` already cites *"correction Phase
+2a"* as the phase that makes the em-dash ban per-profile suppressible, so that citation
+resolves correctly against this table and a fresh id would have broken it, and no
+retirement work survives for a later reader to confuse it with.
+
+**Three cuts, and the history is the point.** A table re-cut three times with no visible
+history is how a plan loses its authority, so all three reasons stay readable. **The
+first cut, 2026-08-19**, replaced the PRD's sixteen steps with these phases, because the
+old principle held three working formats behind a count of ten shipped posts while G1
+graded D. **The second cut, 2026-08-20**, split Phase 1 into 1a and 1b and Phase 2 into
+2a through 2d. Its reason was in the code and it is still correct: `gateNegative` opens
+two files, `voice.md` and `shipped-history.md` (`reference/engine.js:1067-1071`), and
+nothing else, not `identity.md`, not `thesis.md`, not `audience.md`, not `inventory.md`,
+not `learnings.md`, every one of which is an interview output. So the paste gated the
+negative control and the interview did not, which narrowed a 45-minute conversation to a
+ten-minute paste and stopped the old row charging the interview's clock to a dependency
+the interview was not in. **The third cut, today**, is the one both earlier cuts walked
+past. They argued about how *wide* the dependency on Joseph reached; neither asked what
+it fed, which was a strikethrough in a file that ships to every install. The artifact was
+wrong, so the dependency was never a scheduling problem and no amount of narrowing was
+going to fix it. What survives all three cuts: neither half of Phase 1 can be delegated,
+because both are Joseph talking.
+
+**What is left of the build, and what it waits on.** 2a, 2b, 2c, 3 and 5 are the whole
+of it, and every one of them is code against a spec that already exists. 2a reads a
+profile file that may be absent and must behave correctly when it is, which is testable
+against `_template` and a fixture profile with a planted em dash. 2b is restructuring of
+`TELLS` and the cap and touches no profile. 2c's three checks carry absolute fallbacks
+for a profile with no baseline, which `statsText` already implements for the voice floor
+(`reference/engine.js:873-881`), so all three are testable against `gate-fixtures/`
+before a sample is pasted. 3 and 5 never needed a corpus. **Nothing in the table blocks
+anything else in it.** 1a, 1b and 4 are the first real run of a finished engine, and
+Phase 6 is the only row downstream of them, because a measured threshold needs somebody's
+measurements.
+
+Superseded by the paragraphs above, and readable here because the 08-20 reading is what
+the 08-23 cut supersedes rather than contradicts: *"Phases 4 and 5 run in parallel.
+Inventory depth gates draft quality, not format support. **Revised 2026-08-20:** 1b, 2b,
+2c, 3 and 5 all run in parallel with each other too, which is what the split is for. The
+only serial chain left is 1a, 1.3, 2a, 2d."* Phase 4 now runs after Phase 5 rather than
+alongside it, which is the same sentence read the other way round: draft quality is what
+you improve on a finished engine, not something you build one around. Section 2's two
+`Phase 2` headings are relabelled 2b and 2c to match this table.
 
 ### Deleted from the PRD build order
 - Step 10, the render pipeline. Vendored instead.
@@ -143,7 +207,7 @@ philosophy and homework, the append-only rule, and §1.3's write constraint.
 
 | # | Site | Fix |
 | :- | :- | :- |
-| 0a | `stripFences` comment, engine.js:306 | **Respecified 2026-08-19, and the row above it in this file was wrong.** There is no functional fence bug. `voiceSamples` strips fences correctly, because the Samples schema example lives in a fence and must not count as a real sample, and `selfTest` already locked that. `voiceMeasures` reads fence-and-all correctly, because the four frozen measurements are typed inside a fence. The asymmetry is intentional. The defect was the comment sitting on `stripFences`, which described an exception none of its callers implement. Fix: correct the comment, add assertions pinning the split in both directions, and tell the `voice.md` template to paste **below** the fence. A `keepFences` option would have made the blank template count as a real writing sample and poisoned the Phase 1.3 negative control. Separately verified: `gate --negative` **already** fails loudly on an empty corpus. Nothing to do there. |
+| 0a | `stripFences` comment, engine.js:306 | **Respecified 2026-08-19, and the row above it in this file was wrong.** There is no functional fence bug. `voiceSamples` strips fences correctly, because the Samples schema example lives in a fence and must not count as a real sample, and `selfTest` already locked that. `voiceMeasures` reads fence-and-all correctly, because the four frozen measurements are typed inside a fence. The asymmetry is intentional. The defect was the comment sitting on `stripFences`, which described an exception none of its callers implement. Fix: correct the comment, add assertions pinning the split in both directions, and tell the `voice.md` template to paste **below** the fence. A `keepFences` option would have made the blank template count as a real writing sample and poisoned the negative control. Separately verified: `gate --negative` **already** fails loudly on an empty corpus. Nothing to do there. |
 | 0b | `gateReport`, engine.js:1191 and 1232 | `format` becomes a parameter (`short` \| `long`), not the hardcoded literal `'short'`. The semicolon rule and the length rules scope off it. |
 | 0c | `gateReport`, engine.js:1188 | Wire `overlap` in. It is §3's only hard fail and today it has no invocation site: `SKILL.md:120` defers it to step 5, the engine comment defers it to step 6, and `SKILL.md`'s step 6 is the design gate, visual runs only. Fix `SKILL.md:120` in the same pass. |
 
@@ -160,7 +224,7 @@ green. Two things worth carrying forward:
   §3's only hard fail. It now keys off `gate_passes` and appends a lock 5 clause.
   Anything else reading the gate report has to key off `gate_passes` too.
 - **`format` fails safe.** Only the literal `'long'` opts out. Absent or misspelled
-  lands on `'short'`, the stricter scope, so a typo cannot silently retire the
+  lands on `'short'`, the stricter scope, so a typo cannot silently disable the
   semicolon rule.
 
 ### Phase 2b, the mechanism
@@ -193,7 +257,7 @@ happens once. If the redraft still trips, both drafts are re-measured and **the 
 one ships** with an `unresolved:` line. Comparator: fewer catches wins, ties broken by
 voice-floor distance. Still no run ends without an artifact.
 
-### Phase 2c and 2d, the new checks
+### Phase 2c, the new checks
 
 Engine-owned, deterministic counts, floored against the person's setup baseline with
 absolute fallbacks where no baseline exists:
@@ -206,14 +270,22 @@ absolute fallbacks where no baseline exists:
 
 **Two things Phase 2 has to resolve and nothing currently says how.**
 
-1. **Punctuation density contradicts two live bans.** The density check counts commas,
-   semicolons, parens and dashes. §9 bans em dashes at zero tolerance and semicolons in
-   short posts, which is two of the four inputs. A density floor and a zero-tolerance ban
-   on its own inputs cannot both bind. The order matters: the negative control runs at
-   Phase 1.3 and the retirement follows it at Phase 2a, and the density check is only
-   meaningful over whatever survives that. Do not ship the check before the retirement
-   pass. That is why it is row 2d and not part of 2c: burstiness and nominalisation are
-   downstream of nothing here.
+1. **Punctuation density contradicts two live bans, and it is unblocked anyway.
+   Resolved 2026-08-23.** This item read: *"The density check counts commas, semicolons,
+   parens and dashes. §9 bans em dashes at zero tolerance and semicolons in short posts,
+   which is two of the four inputs. A density floor and a zero-tolerance ban on its own
+   inputs cannot both bind. The order matters: the negative control runs at Phase 1.3 and
+   the retirement follows it at Phase 2a, and the density check is only meaningful over
+   whatever survives that. Do not ship the check before the retirement pass. That is why
+   it is row 2d and not part of 2c."* The contradiction is real and the schedule it
+   implied is void, because there is no global retirement for the check to be meaningful
+   over. Under per-profile suppression the floor works the way every other distribution
+   check in §9 already works: it counts against the person's own baseline. Where a ban is
+   suppressed for that person the mark is theirs to use and it counts toward their
+   density; where a ban is live for them the check floors on the marks they actually use,
+   which is the same absolute-fallback logic burstiness and nominalisation carry. Nothing
+   about it waits on a corpus that does not exist yet, so 2d merges into 2c and all three
+   checks are specified and built together.
 2. **`bound 3 becomes bound 1` is withdrawn.** Reordered in emphasis only. The four bounds
    keep their numbers. Renumbering does not break the nineteen citations in `SKILL.md`,
    `reference/ai-tells.md` and `reference/engine.js`; it makes them resolve *silently
@@ -225,21 +297,61 @@ absolute fallbacks where no baseline exists:
 **Register inflation goes to the model, not the engine.** It is a judgment, and §9's
 honesty rule is that zero tolerance is a promise only the deterministic half can keep.
 
-### The retirement rule
+### The suppression rule
 
-**Nothing is retired until `gate --negative profiles/joseph` has run on real samples.**
-Em dash and semicolon are the strong prediction, not the authority. The negative control
-is. §13.2 step 4 already sets the bar: zero rewrites on the person's own writing.
-Retirement follows §9's maintenance path — struck through in `ai-tells.md` with the date
-and the reason, so it stops firing and stays visible.
+**Replaced 2026-08-23.** This section was the retirement rule and it read: *"Nothing is
+retired until `gate --negative profiles/joseph` has run on real samples. Em dash and
+semicolon are the strong prediction, not the authority. The negative control is. §13.2
+step 4 already sets the bar: zero rewrites on the person's own writing. Retirement
+follows §9's maintenance path, struck through in `ai-tells.md` with the date and the
+reason, so it stops firing and stays visible."*
 
-Predicted, from 12 human-published articles in `tim-writing-os` (a proxy, not the
-authority): 64 rewrites demanded. em-dash 36, rhetorical-fragment 11, semicolon 9,
-title-case-header 4, banned/en-dash/antithesis 4.
+Three of its five sentences survive verbatim and are why the negative control exists at
+all: the prediction is not the authority, the negative control is, and the bar is zero
+rewrites on the person's own writing. The first sentence and the last one are the defect,
+and decision 4 above holds the argument. `ai-tells.md` ships to every install, so a
+strikethrough there is a global edit made on one writer's punctuation, and the
+precondition in the first sentence was guarding the wrong thing: it made sure the edit
+was evidenced, never that the edit belonged in a shared file.
+
+**Rules are never retired for over-firing. They are suppressed per profile.**
+`ai-tells.md` ships identical to everyone with every rule on. Setup runs the negative
+control over the person's own pasted samples and writes
+`profiles/<handle>/gate-calibration.md`, which records every rule that rewrote a word
+they wrote, its fire count, and the sample that fired it. The gate reads it on every run.
+The contract, in five lines:
+
+1. **Evidence or nothing.** A `fired:` count above zero on that person's corpus, with the
+   sample named. No hand-editing: a suppression somebody typed is indistinguishable in
+   the file from one a measurement earned.
+2. **Absence means everything fires.** No file, or no entry, means the rule is live. A
+   missing calibration is never a clean pass.
+3. **Reported, never silent.** `gate --report` names what this profile suppresses, and
+   `--fixtures` states any suppression in force when it reports recall, because recall
+   measured over a suppressed rule is a number the engine did not earn.
+4. **Repair class only.** A `reject`, meaning clearance and private terms, is never
+   suppressible by anyone. A `redraft` or a `flag` edits no word the person wrote, so it
+   has nothing to suppress.
+5. **`ai-tells.md` and the tell table stay in lockstep.** `gate --tells` drift is
+   unaffected, because neither file changes per person. Suppression is a third file the
+   gate consults.
+
+PRD §9's suppression rule is the spec and this section is the record of the reversal.
+The zero-rewrites bar moves with it: it is not a build acceptance test on one man's
+corpus, it is the invariant every setup establishes for the person it just interviewed,
+at every install, and PRD §13.2 step 4 is reworded to say so.
+
+**The prediction, still recorded as a prediction.** From 12 human-published articles in
+`tim-writing-os` (a proxy, not the authority): 64 rewrites demanded. em-dash 36,
+rhetorical-fragment 11, semicolon 9, title-case-header 4, banned/en-dash/antithesis 4.
+It predicted which rules would die. Nothing dies, so what it now predicts is which lines
+Joseph's `gate-calibration.md` will carry, and the same list run against another person
+predicts a different calibration. That is the whole reason the calibration is per
+profile.
 
 ---
 
-## Section 3: the reader (DRAFT, pending sign-off)
+## Section 3: the reader (APPROVED 2026-08-23)
 
 `reference/reader.md`, ported from `~/Desktop/tim-writing-os/.claude/skills/grade-dis-jawn/SKILL.md`.
 
@@ -259,14 +371,18 @@ completely clean and be worthless, and no step would notice.
   keeps the reader on the correct side of finding 01.
 - **Pipeline position: step 5b**, after the gate, before ship. The grade joins the run
   line. It does not block.
-- **The one tension, resolved explicitly.** The reader's "Human hand" principle lists em
-  dashes as a tell, while Phase 2 retires the mechanical em-dash ban. Both are correct:
-  a reader noticing punctuation *density* holistically is a different instrument from a
-  zero-tolerance mechanical ban, and only the second one rewrites the human's
-  punctuation. Record this in `ai-tells.md`'s maintenance log so it is not later "fixed"
-  as an inconsistency.
+- **The one tension, resolved explicitly. Restated 2026-08-23.** The reader's "Human
+  hand" principle lists em dashes as a tell, while Phase 2a makes the mechanical em-dash
+  ban per-profile suppressible; this bullet read "while Phase 2 retires the mechanical
+  em-dash ban," and nothing is retired. Both instruments are correct: a reader noticing
+  punctuation *density* holistically is a different instrument from a zero-tolerance
+  mechanical ban, and only the second one rewrites the human's punctuation, which is why
+  only the second one is suppressible. A profile whose em-dash ban is suppressed still
+  hears the reader on density, and that is the instrument working rather than a stale rule
+  nobody caught. Record it in `ai-tells.md`'s maintenance log and in the reader's own
+  spec, so it is not later "fixed" as an inconsistency in either direction.
 
-## Section 4: onboarding (DRAFT, pending sign-off)
+## Section 4: onboarding (APPROVED 2026-08-23)
 
 Time to first publishable post is roughly 165 minutes. The repo documents this in its own
 quit-risk exemption: *"minute 165 of an interview is where people quit."* Best-in-class
@@ -281,7 +397,10 @@ does not.
   things they wrote. Anything unedited counts. That is currently optional and sixth in
   `workflows/setup.md`'s order.
 - That paste writes `voice.md` samples plus `shipped-history.md`, which is what makes the
-  negative control runnable on day one instead of never.
+  negative control runnable on day one instead of never. **Added 2026-08-23:** the front
+  door runs it there and then and writes `gate-calibration.md`, so the gate is already
+  this person's gate before their first draft. That is Phase 2a's shipped capability, and
+  it is the whole of what the retirement pass used to be.
 - Minimum viable draft from the smallest possible inventory, then the calibration post.
 - **The deep interview becomes the upgrade it actually is**, chunked into 30-45 minute
   sessions that each end in a visible output improvement.
@@ -293,7 +412,7 @@ does not.
   URL is the literal string `<url>`, the ships list names files that do not exist, and
   five of the nine advertised commands route to missing workflow files.
 
-## Section 5: the formats (DRAFT, pending sign-off)
+## Section 5: the formats (APPROVED 2026-08-23)
 
 Documents and carousels are the top-engagement format in all three primary 2026 datasets:
 Buffer (52M posts), Socialinsider (1.3M), AuthoredUp (3M). They are the format Joseph
@@ -325,15 +444,25 @@ rendered HTML as text rather than on screenshots, per §4's cost argument.
 
 Read this file, then `content-engine-PRD.md` §9 and §13.
 
-**Revised 2026-08-20.** This read *"Start at Phase 0,"* and Phases 0 and 0.5 are both
-done, so it pointed at finished work. **The first unblocked row that blocks anything is
-1a, the paste front door.** 1.3 waits on it, 2a waits on 1.3, 2d waits on 2a, and nothing
-else in the table waits on any of them. Phases 1b, 2b, 2c, 3 and 5 are unblocked today, so
-a subagent can start 2b, 2c, 3 or 5 before Joseph has pasted a word.
+**Revised 2026-08-23. No row blocks any other row, and nothing waits on Joseph.** This
+read *"The first unblocked row that blocks anything is 1a, the paste front door. 1.3 waits
+on it, 2a waits on 1.3, 2d waits on 2a, and nothing else in the table waits on any of
+them,"* which was true of the 08-20 table and describes a chain that no longer exists.
+1.3 and 2a are not build rows any more, 2d is merged into 2c, and the retirement they fed
+is replaced by per-profile suppression. **Start anywhere in 2a, 2b, 2c, 3 or 5.** Five
+subagents can run them at once, and none of them needs a word of Joseph's writing:
+suppression is a file the gate reads and behaves correctly without, so 2a is built and
+tested against `_template`'s empty samples and a fixture profile with a planted em dash.
 
-Neither half of Phase 1 can be delegated, because both are Joseph talking. Only 1a is a
-gate: `gateNegative` reads `voice.md` and `shipped-history.md` and no interview output
-(`reference/engine.js:1067-1071`). 1b, the interview, gates nothing in the build. This
-paragraph used to read that Phase 1 *"is the gate on Phases 1.3 and 2,"* which widened a
-ten-minute paste into a 45-minute conversation and put two hours of corpus-free code
-behind it.
+**Phase 1a and 1b are not gates and they are not first.** They are the first real run of a
+finished engine, and they sit below the Phase 3 checkpoint and below Phase 5, because the
+engine is packaged before it is pointed at a person. Neither can be delegated, because
+both are Joseph talking. Phase 6 is the only row downstream of them, since a measured
+threshold needs somebody's measurements and a first calibration needs a first profile.
+
+Two earlier versions of this paragraph are worth keeping visible, because they are the
+same mistake narrowing rather than going away. It read *"Start at Phase 0"* until 08-20,
+when Phases 0 and 0.5 were both done and it pointed at finished work. Before that it read
+that Phase 1 *"is the gate on Phases 1.3 and 2,"* which widened a ten-minute paste into a
+45-minute conversation and put two hours of corpus-free code behind it. Both were arguments
+about how much of the build waited on one person. The answer was none of it.
