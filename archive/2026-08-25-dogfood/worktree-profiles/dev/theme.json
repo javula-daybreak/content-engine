@@ -1,0 +1,12 @@
+{
+  "bg": "#0E1116",
+  "fg": "#E6EDF3",
+  "accent": "#3FB950",
+  "muted": "#8B949E",
+  "font_head": "'SF Mono', Menlo, Consolas, monospace",
+  "font_body": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif",
+  "scale": "dense",
+  "radius": "0px",
+  "rule_weight": "1px",
+  "logo": ""
+}

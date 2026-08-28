@@ -1,0 +1,12 @@
+{
+  "bg": "#FFFFFF",
+  "fg": "#111111",
+  "accent": "#1F5C3D",
+  "muted": "#767470",
+  "font_head": "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  "font_body": "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  "scale": "airy",
+  "radius": "0px",
+  "rule_weight": "1px",
+  "logo": ""
+}

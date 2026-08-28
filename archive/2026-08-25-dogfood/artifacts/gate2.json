@@ -1,0 +1,161 @@
+{
+  "check": "gate",
+  "mode": "report",
+  "gate_passes": false,
+  "gate_catch_count": 3,
+  "tags": [
+    "burstiness",
+    "rhetorical-fragment",
+    "voice-floor"
+  ],
+  "action": "redraft",
+  "rewrites_required": 0,
+  "rewrite_cap": 3,
+  "over_cap": false,
+  "redraft_constraints": [
+    "burstiness",
+    "rhetorical-fragment",
+    "voice-floor"
+  ],
+  "flagged": 0,
+  "words": 117,
+  "format": "short",
+  "overlap_priors_compared": 2,
+  "not_rewritten_quoted_or_factual": [],
+  "lexical": {
+    "check": "lexical",
+    "pass": false,
+    "format": "short",
+    "action": "redraft",
+    "rewrite_count": 0,
+    "redraft_count": 1,
+    "redraft_tells": [
+      "rhetorical-fragment"
+    ],
+    "hits": [
+      {
+        "tag": "rhetorical-fragment",
+        "term": "items:",
+        "at": 279,
+        "match": "items:",
+        "protected": false,
+        "tell": "rhetorical-fragment",
+        "action": "redraft"
+      }
+    ],
+    "not_rewritten_quoted_or_factual": [],
+    "suppressed_by_calibration": [],
+    "hashtags": {
+      "count": 0,
+      "stack": false
+    },
+    "private_terms": {
+      "brief": "found",
+      "checked": 0,
+      "violations": [],
+      "note": "a private_terms hit is a rejection, never a repair, and it is never suppressible. Section 9, and gate-calibration.md rule 4."
+    }
+  },
+  "stats": {
+    "check": "stats",
+    "pass": false,
+    "measured": {
+      "sentences": 15,
+      "words": 117,
+      "avg_sentence_length": 7.8,
+      "sentence_length_stdev": 3.99,
+      "contraction_rate": 3.42,
+      "comma_density": 5.98,
+      "burstiness": 0.511,
+      "punctuation_density": 5.98,
+      "nominalisation_rate": 0,
+      "specifics": 23,
+      "proper_nouns": 15,
+      "first_person_plural": 1,
+      "paragraph_lines": [
+        5,
+        11
+      ],
+      "shortest_sentence": 1,
+      "longest_sentence": 13
+    },
+    "baseline": {
+      "avg_sentence_length": 16.4,
+      "sentence_length_stdev": 9.7,
+      "contraction_rate": 0.42,
+      "uses_fragments": "yes"
+    },
+    "baseline_source": "voice.md",
+    "distribution_baselines": {
+      "avg_sentence_length": 16.4,
+      "sentence_length_stdev": 9.7,
+      "contraction_rate": 0.42,
+      "burstiness": 0.72,
+      "punctuation_density": 3.82
+    },
+    "flags": [
+      {
+        "rule": "voice-floor",
+        "action": "redraft",
+        "metric": "sentence_length_stdev",
+        "draft": 3.99,
+        "baseline": 9.7,
+        "floor": 7.28
+      },
+      {
+        "rule": "burstiness",
+        "action": "redraft",
+        "metric": "burstiness",
+        "draft": 0.511,
+        "baseline": 0.72,
+        "limit": 0.54,
+        "direction": "below",
+        "source": "gate-calibration.md"
+      }
+    ],
+    "suppressed_by_calibration": []
+  },
+  "overlap": {
+    "ran": true,
+    "check": "overlap",
+    "pass": true,
+    "priors_compared": 2,
+    "ngram": 8,
+    "failures": [],
+    "warnings": [],
+    "sentence_similarity": []
+  },
+  "model_owned": [
+    "unearned-rule-of-three",
+    "parallel-bullets",
+    "restating-close",
+    "announcement-shape",
+    "testimonial-quote",
+    "all-contractions",
+    "clearance"
+  ],
+  "calibration": {
+    "file": "found",
+    "suppressed": [
+      "em-dash"
+    ],
+    "evidence": [
+      {
+        "rule": "em-dash",
+        "fired": 1,
+        "sample": "voice.md:doc-1",
+        "note": "fired on the person's own unedited writing"
+      }
+    ],
+    "baselines": {
+      "avg_sentence_length": 16.4,
+      "sentence_length_stdev": 9.7,
+      "contraction_rate": 0.42,
+      "burstiness": 0.72,
+      "punctuation_density": 3.82
+    },
+    "measured_at": "2026-08-25",
+    "note": "these rules did not fire on this draft because they are suppressed for this profile, on the evidence above. They are not retired: reference/ai-tells.md ships identical to everyone with every rule on."
+  },
+  "note": "gate_catch_count and tags are engine-owned tells only. rewrites_required is repairs, which is all the editing section 9 leaves, and over_cap true is bound 3: return to brief.md and redraft once with redraft_constraints as the constraints. The redraft happens once; if it still trips, gate --compare picks which of the two ships. Lock 5 is reported under overlap and is counted nowhere else, so read that block rather than the tag list for it."
+}
