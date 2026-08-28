@@ -266,6 +266,13 @@ const PHRASED = [
   { term: "here's the thing", tag: 'rhetorical-fragment' },
 ];
 
+// A spec/brief `key:` or `key: value` line -- render/*/render.py's own
+// required field syntax (`items:`, `title: One Hex Code`, ...). Structural,
+// not prose: a bare list-opener key reads as a rhetorical fragment and a
+// Title Case field value reads as a title-case header below, so every valid
+// visual spec failed both checks unconditionally, on every archetype (T1-2).
+const SPEC_KEY_LINE = /^[a-z][a-z0-9_]*:(\s|$)/;
+
 const PATTERNS = [
   // "but also" is not how the second half actually lands. A model writes "but
   // we also" and "but they also" more often than the adjacent form section 9
@@ -857,7 +864,8 @@ function lexicalText(draft, opts, privateTerms, briefFound) {
   for (const line of draft.split(/\r?\n/)) {
     const t = line.trim();
     const w = t.split(/\s+/).filter(Boolean);
-    if (t && t.length < 60 && w.length >= 3 && !/[.!?:,]$/.test(t) && !/^#/.test(t)) {
+    if (t && t.length < 60 && w.length >= 3 && !/[.!?:,]$/.test(t) && !/^#/.test(t) &&
+        !SPEC_KEY_LINE.test(t)) {
       const caps = w.filter(x => /^[A-Z][a-z]/.test(x)).length;
       if (caps >= Math.ceil(w.length * 0.7)) {
         hits.push({ tag: 'title-case-header', term: t, at: offset, match: t });
@@ -879,7 +887,7 @@ function lexicalText(draft, opts, privateTerms, briefFound) {
     // is a two-word rhetorical line containing a number, which the model still
     // owns.
     if (t && w.length <= 2 && /[?:]$/.test(t) && /[A-Za-z]/.test(t) &&
-        !/\d/.test(t) && !/^#/.test(t) && !/^[-*>]/.test(t)) {
+        !/\d/.test(t) && !/^#/.test(t) && !/^[-*>]/.test(t) && !SPEC_KEY_LINE.test(t)) {
       const isPhrased = PHRASED.some(ph => t.toLowerCase().startsWith(ph.term.slice(0, 12)));
       if (!isPhrased) {
         hits.push({ tag: 'rhetorical-fragment', term: t, at: offset, match: t });
