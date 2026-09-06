@@ -655,9 +655,19 @@ node reference/engine.js gate                      # recall over gate-fixtures/
 node reference/engine.js gate --negative <profile> # fires on the person's own writing
 node reference/engine.js gate --hooks              # hooks.md example lines
 node reference/engine.js gate --tells              # this file against the TELLS table
+node reference/engine.js gate --checklist          # the compact view, same table
 ```
 
-Run all four whenever this file changes. PRD section 12.1 metric 4 is the
+`gate --checklist` added 2026-09-06. It prints every row's `fires` and `fix`
+field, nothing else, and is what actually loads at gate time now, per
+`SKILL.md` step 5. This file stays the canonical source: the checklist reads
+straight off the same `TELLS` table `gate --tells` already checks against
+this file, so it cannot drift in which tells exist, only in wording if
+someone edits `fires`/`fix` in `engine.js` without updating the matching
+prose here. There is no fixture for it and none is needed: it carries no new
+detection logic, only a restatement of fields already on the table.
+
+Run all five whenever this file changes. PRD section 12.1 metric 4 is the
 false-positive rate and it is the one that decides whether this file survives
 contact with a real profile.
 
@@ -762,3 +772,12 @@ same pattern re-adds it, and the reason it failed is gone.
   was not already: `voice.md` still wins, bound 4's protected spans still hold,
   and every new engine-owned row is caught by the same `gate --negative`
   calibration as the rest of the table.
+- **2026-09-06.** This file had grown to 760+ lines, all of it reloaded into
+  the live conversation on every single gate call per the old wording of
+  `SKILL.md` step 5, most of it rationale and changelog a human needs and a
+  model applying the rules at gate time does not. Added `fires` and `fix`
+  fields to every row in the `TELLS` table and a `gate --checklist` mode that
+  prints just those, one line per tell. `SKILL.md` step 5 now loads the
+  checklist at gate time instead of this file. Nothing here shrank and no
+  rule changed: this file is still what `gate --tells` checks against and
+  still where the rationale lives, read on demand rather than by default.

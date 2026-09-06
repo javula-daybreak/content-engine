@@ -26,6 +26,7 @@
 //   node reference/engine.js gate    --compare <first.md> <redraft.md> [profile-dir]
 //   node reference/engine.js gate    --hooks [hooks.md]
 //   node reference/engine.js gate    --tells [ai-tells.md]
+//   node reference/engine.js gate    --checklist
 //   node reference/engine.js test
 //
 // Every subcommand prints one JSON object to stdout and exits 0. Exit 1 means
@@ -161,44 +162,84 @@ const FIXTURE_COUNT = 20;
 // profiles/<handle>/gate-calibration.md. Their class is settled by bound 2,
 // which names the em dash as its own worked example of a substitution and
 // forbids the sentence split that would make it a restructure.
+// `fires` and `fix` are the compact pair `gate --checklist` prints: what
+// triggers the tell and what to do about it, both under about a dozen words.
+// They are the runtime-facing summary of the prose in ai-tells.md, not a
+// second copy of it, so they carry no rationale and no PRD citation. Full
+// detail, the "why", and the changelog stay in ai-tells.md, read on demand
+// rather than loaded on every gate call. Keep both in sync by hand; `gate
+// --tells` catches an id drifting out of step, not wording drifting stale.
 const TELLS = [
-  { id: 'antithesis', owner: 'both', tag: 'antithesis', action: 'redraft' },
-  { id: 'unearned-rule-of-three', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'parallel-bullets', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'rhetorical-fragment', owner: 'engine', tag: 'rhetorical-fragment', action: 'redraft' },
-  { id: 'restating-close', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'engagement-bait-close', owner: 'engine', tag: 'engagement-bait-close', action: 'redraft' },
-  { id: 'thinking-opener', owner: 'engine', tag: 'thinking-opener', action: 'redraft' },
-  { id: 'uniform-paragraphs', owner: 'engine', tag: 'uniform-paragraphs', action: 'redraft' },
-  { id: 'em-dash', owner: 'engine', tag: 'em-dash', action: 'rewrite' },
-  { id: 'en-dash', owner: 'engine', tag: 'en-dash', action: 'rewrite' },
-  { id: 'semicolon', owner: 'engine', tag: 'semicolon', action: 'rewrite' },
-  { id: 'banned-lexicon', owner: 'engine', tag: 'banned', action: 'rewrite' },
-  { id: 'not-only-but-also', owner: 'engine', tag: 'not-only-but-also', action: 'redraft' },
-  { id: 'hedged-opener', owner: 'both', tag: 'hedged-opener', action: 'redraft' },
-  { id: 'announcement-phrase', owner: 'engine', tag: 'announcement', action: 'redraft' },
-  { id: 'at-company-we-believe', owner: 'engine', tag: 'at-company-we-believe', action: 'redraft' },
-  { id: 'we-with-no-human', owner: 'engine', tag: 'we-with-no-human', action: 'redraft' },
-  { id: 'announcement-shape', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'testimonial-quote', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'no-fragments', owner: 'engine', tag: 'no-fragments', action: 'flag' },
-  { id: 'no-long-sentence', owner: 'engine', tag: 'no-long-sentence', action: 'flag' },
-  { id: 'zero-contractions', owner: 'engine', tag: 'zero-contractions', action: 'redraft' },
-  { id: 'all-contractions', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'emoji-bullets', owner: 'engine', tag: 'emoji-bullets', action: 'rewrite' },
-  { id: 'hashtag-stack', owner: 'engine', tag: 'hashtag-stack', action: 'rewrite' },
-  { id: 'title-case-header', owner: 'engine', tag: 'title-case-header', action: 'rewrite' },
-  { id: 'specifics-floor', owner: 'engine', tag: 'specifics-floor', action: 'redraft' },
-  { id: 'voice-floor', owner: 'engine', tag: 'voice-floor', action: 'redraft' },
+  { id: 'antithesis', owner: 'both', tag: 'antithesis', action: 'redraft',
+    fires: '"it\'s not X, it\'s Y", or "not X. not Y. Z."', fix: 'state the surviving claim, drop the rest' },
+  { id: 'unearned-rule-of-three', owner: 'model', tag: null, action: 'redraft',
+    fires: 'a list of exactly 3 the content did not require', fix: 'cut to what the material supports, or add the real 4th' },
+  { id: 'parallel-bullets', owner: 'model', tag: null, action: 'redraft',
+    fires: 'every bullet same part of speech, same length', fix: 'break the parallel on at least one item' },
+  { id: 'rhetorical-fragment', owner: 'engine', tag: 'rhetorical-fragment', action: 'redraft',
+    fires: 'a drum-roll line or setup before the point ("The result?", "Plot twist:")', fix: 'fold it into the sentence that follows' },
+  { id: 'restating-close', owner: 'model', tag: null, action: 'redraft',
+    fires: 'final paragraph repeats the claim, or a metaphor/mic-drop kicker', fix: 'delete it, end one line earlier' },
+  { id: 'engagement-bait-close', owner: 'engine', tag: 'engagement-bait-close', action: 'redraft',
+    fires: '"Thoughts?", "What\'s your take?"', fix: 'delete, or ask something only this writer would ask' },
+  { id: 'thinking-opener', owner: 'engine', tag: 'thinking-opener', action: 'redraft',
+    fires: '"I\'ve been thinking a lot about"', fix: 'start at the second sentence' },
+  { id: 'uniform-paragraphs', owner: 'engine', tag: 'uniform-paragraphs', action: 'redraft',
+    fires: '3+ paragraphs, all the same line count (2+ lines)', fix: 'merge one, split one' },
+  { id: 'em-dash', owner: 'engine', tag: 'em-dash', action: 'rewrite',
+    fires: 'any em dash', fix: 'comma, colon, or parenthesis, never a period' },
+  { id: 'en-dash', owner: 'engine', tag: 'en-dash', action: 'rewrite',
+    fires: 'en dash not flanked by digits', fix: '"to" for a range, a hyphen for a compound' },
+  { id: 'semicolon', owner: 'engine', tag: 'semicolon', action: 'rewrite',
+    fires: 'any semicolon, short posts only', fix: 'comma, colon, or period' },
+  { id: 'banned-lexicon', owner: 'engine', tag: 'banned', action: 'rewrite',
+    fires: 'a banned word or phrase (full list in ai-tells.md)', fix: 'the plain word, or delete' },
+  { id: 'not-only-but-also', owner: 'engine', tag: 'not-only-but-also', action: 'redraft',
+    fires: '"not only ... but ... also"', fix: '"X and Y", or two sentences' },
+  { id: 'hedged-opener', owner: 'both', tag: 'hedged-opener', action: 'redraft',
+    fires: 'apologises before a claim, or steps outside it to guide the reader', fix: 'delete the hedge or aside, keep the claim' },
+  { id: 'announcement-phrase', owner: 'engine', tag: 'announcement', action: 'redraft',
+    fires: '"we\'re excited to share", "stay tuned"', fix: 'open on the news, name the person' },
+  { id: 'at-company-we-believe', owner: 'engine', tag: 'at-company-we-believe', action: 'redraft',
+    fires: '"at <Company>, we believe"', fix: 'name who believes it and what they did' },
+  { id: 'we-with-no-human', owner: 'engine', tag: 'we-with-no-human', action: 'redraft',
+    fires: '"we" throughout, no named person anywhere', fix: 'name one person and what they did' },
+  { id: 'announcement-shape', owner: 'model', tag: null, action: 'redraft',
+    fires: 'the only news is that news exists, nothing to act on', fix: 'redraft from brief.md, or do not post' },
+  { id: 'testimonial-quote', owner: 'model', tag: null, action: 'redraft',
+    fires: 'a customer quote used as proof, no speaker or context', fix: 'cut it, or give it a real situation' },
+  { id: 'no-fragments', owner: 'engine', tag: 'no-fragments', action: 'flag',
+    fires: 'no sentence under 6 words', fix: 'flag only; break one sentence into a fragment' },
+  { id: 'no-long-sentence', owner: 'engine', tag: 'no-long-sentence', action: 'flag',
+    fires: 'no sentence over 25 words', fix: 'flag only; join two related sentences' },
+  { id: 'zero-contractions', owner: 'engine', tag: 'zero-contractions', action: 'redraft',
+    fires: 'zero contractions across 40+ words', fix: 'contract the 2-3 that read naturally aloud' },
+  { id: 'all-contractions', owner: 'model', tag: null, action: 'redraft',
+    fires: 'every contractible site contracted', fix: 'expand 2-3, usually the ones carrying emphasis' },
+  { id: 'emoji-bullets', owner: 'engine', tag: 'emoji-bullets', action: 'rewrite',
+    fires: 'a line opening on an emoji', fix: 'a hyphen, or no bullet at all' },
+  { id: 'hashtag-stack', owner: 'engine', tag: 'hashtag-stack', action: 'rewrite',
+    fires: '3 or more hashtags', fix: 'keep at most two, or none' },
+  { id: 'title-case-header', owner: 'engine', tag: 'title-case-header', action: 'rewrite',
+    fires: 'short line, 70%+ of words capitalized', fix: 'sentence case, or fold into the paragraph' },
+  { id: 'specifics-floor', owner: 'engine', tag: 'specifics-floor', action: 'redraft',
+    fires: 'zero named people, companies, dates, or numerals', fix: 'redraft with a real instance, not a bolted-on number' },
+  { id: 'voice-floor', owner: 'engine', tag: 'voice-floor', action: 'redraft',
+    fires: 'stdev or contraction rate 25%+ below voice.md', fix: 'a different draft; there is no span to edit' },
   // Section 9's three Phase 2 checks. Counts, not judgments, and all three are
   // redraft-class: a distribution is a property of the whole draft and there is
   // no span to patch. Punctuation density shipped last, and the thing that
   // unblocked it was not a retirement. See statsText.
-  { id: 'burstiness', owner: 'engine', tag: 'burstiness', action: 'redraft' },
-  { id: 'punctuation-density', owner: 'engine', tag: 'punctuation-density', action: 'redraft' },
-  { id: 'nominalisation-rate', owner: 'engine', tag: 'nominalisation-rate', action: 'redraft' },
-  { id: 'clearance', owner: 'model', tag: null, action: 'reject' },
-  { id: 'private-terms', owner: 'engine', tag: 'private-terms', action: 'reject' },
+  { id: 'burstiness', owner: 'engine', tag: 'burstiness', action: 'redraft',
+    fires: 'sentence-length variation too flat vs. baseline', fix: 'a different draft; there is no span to edit' },
+  { id: 'punctuation-density', owner: 'engine', tag: 'punctuation-density', action: 'redraft',
+    fires: 'too few commas/dashes/parens per 100 words', fix: 'a different draft; there is no span to edit' },
+  { id: 'nominalisation-rate', owner: 'engine', tag: 'nominalisation-rate', action: 'redraft',
+    fires: 'too many -tion/-ment/-ity nouns per 100 words', fix: 'turn nouns back into verbs; a redraft, not a patch' },
+  { id: 'clearance', owner: 'model', tag: null, action: 'reject',
+    fires: 'a company, person, role+employer+timeframe, or figure not cleared public', fix: 'reject and redraft without the disclosure' },
+  { id: 'private-terms', owner: 'engine', tag: 'private-terms', action: 'reject',
+    fires: 'any literal string from brief.md\'s private_terms', fix: 'reject and redraft without it' },
   // 2026-09-06: no-ai-slop incorporation. The globally-installed skill of that
   // name is a general-purpose human-editor pass, and this repo already had a
   // stricter, per-profile-calibrated version of most of it. These six rows are
@@ -206,12 +247,18 @@ const TELLS = [
   // BANNED and PHRASED under existing or new tags, same as every tell above;
   // the remaining five are judgment calls with no reliable literal form, which
   // is exactly what owner: model already means in this table.
-  { id: 'puffery-attribution', owner: 'engine', tag: 'puffery-attribution', action: 'redraft' },
-  { id: 'synonym-cycling', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'superficial-analysis', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'colon-reveal', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'formatting-slop', owner: 'model', tag: null, action: 'redraft' },
-  { id: 'dramatic-fragmentation', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'puffery-attribution', owner: 'engine', tag: 'puffery-attribution', action: 'redraft',
+    fires: '"marks a pivotal moment", "studies show", "experts agree"', fix: 'state the fact plainly, or name the source' },
+  { id: 'synonym-cycling', owner: 'model', tag: null, action: 'redraft',
+    fires: 'rotating words for style where one should repeat', fix: 'pick the right word and repeat it' },
+  { id: 'superficial-analysis', owner: 'model', tag: null, action: 'redraft',
+    fires: '-ing clause hand-waving ("highlighting", "underscoring")', fix: 'replace with the actual mechanism or consequence' },
+  { id: 'colon-reveal', owner: 'model', tag: null, action: 'redraft',
+    fires: 'noun phrase: lowercase dramatic reveal, mid-sentence', fix: 'rewrite as a plain sentence' },
+  { id: 'formatting-slop', owner: 'model', tag: null, action: 'redraft',
+    fires: 'bold mid-sentence, bullets over prose, headers over 2 sentences', fix: 'drop the decoration, let the content carry it' },
+  { id: 'dramatic-fragmentation', owner: 'model', tag: null, action: 'redraft',
+    fires: '"X. And Y. And Z." strung together for punch', fix: 'write it in complete sentences' },
 ];
 
 const tellById = new Map(TELLS.map(x => [x.id, x]));
@@ -1881,6 +1928,25 @@ function gateTells(file) {
   };
 }
 
+// The compact, runtime-facing view of TELLS. ai-tells.md is ~760 lines of
+// rule plus rationale plus changelog, all of it reloaded on every gate call
+// under the old design; most of that is for a human maintaining the file, or
+// for `gate --tells` matching ids, neither of which the model needs at gate
+// time to apply a rule. This is the same 39 rows with only `fires` and `fix`
+// kept, one line each, so the thing actually loaded into a live run is a
+// checklist rather than a document. ai-tells.md stays canonical: this is
+// generated from the same TELLS table it is, never a second place to edit.
+function gateChecklist() {
+  return {
+    check: 'gate', mode: 'checklist',
+    total: TELLS.length,
+    engine_owned: TELLS.filter(x => x.tag).length,
+    model_owned: TELLS.filter(x => !x.tag).length,
+    note: 'one line per tell: what fires it, what to do. Full rationale and history is ai-tells.md, read on demand, not on every gate call.',
+    tells: TELLS.map(t => ({ id: t.id, owner: t.owner, action: t.action, fires: t.fires, fix: t.fix })),
+  };
+}
+
 // --------------------------------------------------------------- self-check
 
 function writeFixture(root, rel, body) {
@@ -2346,6 +2412,16 @@ function selfTest() {
     assert.strictEqual(tl.total, TELLS.length, 'the count is the table');
     assert.strictEqual(gateTells(path.join(root, 'nope.md')).pass, false,
       'and an absent ai-tells.md is a failure, not a clean table');
+
+    // gate --checklist: the compact runtime view. Same count as the table, and
+    // every row carries the two fields it exists to carry, or a blank one
+    // ships silently and the whole point of a checklist is lost on that row.
+    const cl = gateChecklist();
+    assert.strictEqual(cl.total, TELLS.length, 'checklist covers the whole table');
+    for (const t of cl.tells) {
+      assert.ok(t.fires && t.fires.length > 0, t.id + ' checklist row has a fires string');
+      assert.ok(t.fix && t.fix.length > 0, t.id + ' checklist row has a fix string');
+    }
 
     // ---------------------------- voice.md's two readers, and their split
     //
@@ -2864,6 +2940,7 @@ function main(argv) {
           args[2] || null, rest.includes('--long') ? 'long' : 'short');
       }
       if (rest.includes('--tells')) return gateTells(args[0] || here('ai-tells.md'));
+      if (rest.includes('--checklist')) return gateChecklist();
       if (rest.includes('--hooks')) return gateHooks(args[0] || here('hooks.md'));
       if (rest.includes('--negative')) return gateNegative(need(args[0], 'profile directory'));
       return gateFixtures(need(args[0] || here('gate-fixtures'), 'fixtures directory'),

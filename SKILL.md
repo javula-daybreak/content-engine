@@ -94,9 +94,13 @@ Load exactly this, and nothing else:
 > items hydrated, and `inspiration.md` only when `voice.md` declares that no
 > samples exist.
 
-`ai-tells.md` loads at gate time, not at draft time. Do not load the render
-templates, the design gate, `inventory-archive.md`, `connectors.md`, or any item
-carrying `withdrawn:` or named by another entry's `supersedes:`.
+`node reference/engine.js gate --checklist` loads at gate time, not at draft
+time, and not `ai-tells.md` itself. The checklist is the same tells, one line
+each of what fires and what to do, generated from the table `ai-tells.md` is
+still the checked-against source for; read `ai-tells.md` only when a specific
+tell needs its full rationale. Do not load the render templates, the design
+gate, `inventory-archive.md`, `connectors.md`, or any item carrying
+`withdrawn:` or named by another entry's `supersedes:`.
 
 The compact index carries `id`, `type`, `tags`, `connects_to`, and `clearance`.
 Hydrate `content` only for the shortlist. Clearance is in the index so the
@@ -227,13 +231,22 @@ nothing, and lock 3 stops binding without saying so.
 
 ### Step 5: the gate
 
-`reference/ai-tells.md` runs on every draft before the human sees it, including
-the calibration post in setup's front door. **That post is now gated against a
-calibration measured minutes earlier from their own samples**, which is the whole
-point of the paste coming first: the first draft a person ever sees is checked by
-a gate that already knows which of its rules do not apply to them. It is not advisory: a draft
-that fails is rewritten before anyone sees it. Full precedence, bounds, and
-protected spans are in PRD section 9 and in `reference/pipeline/`.
+`node reference/engine.js gate --checklist` runs on every draft before the
+human sees it, including the calibration post in setup's front door. **That
+post is now gated against a calibration measured minutes earlier from their
+own samples**, which is the whole point of the paste coming first: the first
+draft a person ever sees is checked by a gate that already knows which of its
+rules do not apply to them. It is not advisory: a draft that fails is
+rewritten before anyone sees it. Full precedence, bounds, and protected spans
+are in PRD section 9 and in `reference/pipeline/`.
+
+**The checklist, not the file, is what loads here.** `reference/ai-tells.md`
+is ~760 lines of rule, rationale, and changelog, most of it for a human
+maintaining the file rather than a model applying it. `gate --checklist`
+prints the same 39 tells from the same table, one line each of what fires and
+what to do, at a fraction of the tokens. Read `ai-tells.md` itself only when a
+specific tell's rationale is needed, never as a matter of routine at this
+step.
 
 Four things bound it and none of them is optional:
 
@@ -284,7 +297,9 @@ Tag `gate-report.md` with those ids, not with prose, because PRD section 13.2
 step 5 asks for a per-tell tag list and a tag has to match something. The ids
 are what `gate-fixtures/expected.md` references and what the ownership table in
 `engine.js` keys on, and `node reference/engine.js gate --tells` fails when the
-file and the table disagree. Run the four harness modes whenever `ai-tells.md`
+file and the table disagree; `gate --checklist` is the same table read for the
+tag list rather than for the ids, and cannot drift from it because it is the
+same table. Run the five harness modes whenever `ai-tells.md` or the table
 changes:
 
 ```
@@ -292,6 +307,7 @@ node reference/engine.js gate                      # recall over gate-fixtures/
 node reference/engine.js gate --negative <profile> # fires on their own writing
 node reference/engine.js gate --hooks              # hooks.md example lines
 node reference/engine.js gate --tells              # the file against the table
+node reference/engine.js gate --checklist          # the compact view this step actually loads
 ```
 
 Retiring a rule is a real move, not a defeat. A tell that fires on this person's
