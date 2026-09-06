@@ -224,17 +224,17 @@ One numeric series, plotted alone, with the headline asking the question the cur
 
 **Two-series overlay** (planned versus actual, us versus them) is a parameter on this form rather than a separate archetype: `series_b` plus a second accent, which makes it blocked on §10 decision 2. It inherits every disqualifier above except the single-series rule, and adds one: the two series must share a unit and an x-axis, or they are two charts.
 
-**Parameters.**
+**Parameters.** Archetype value `trend-poster`.
 
 | Name | Type | Constraint |
 | :- | :- | :- |
 | `headline` | string | 3-8 words, max 2 lines, longest line ~20-24 chars at display weight |
-| `subtitle_scope` | string | 1 line, <=60 chars. Metric, entity, window |
-| `subtitle_units` | string | 1 line, e.g. `(in millions)` |
-| `series` | list<{label, value}> | 6-12 points, labels <=4 chars |
-| `y_axis_max` | number | >= 1.15x max(series), never equal to it |
-| `y_tick_count` | integer | 4-5, always including a zero baseline |
-| `source_name` | string | required, renders as `Data from: <name>` |
+| `sub` | string | 1 line, <=60 chars. Metric, entity, window |
+| `units` | string | 1 line, <=24 chars, e.g. `(in millions)` |
+| `items` | list<{label \| value}> | 6-12 points, labels <=4 chars, <=24 chars each |
+| `y_max` | number | >= 1.15x the top datum, never equal to it |
+| `ticks` | integer | 4-5, always including a zero baseline |
+| `footer` | string | front matter, required, the source line |
 
 **Structure honesty.** The y-axis starts at zero or the image is not made. A truncated baseline on a growth claim is a lie the geometry tells while every word on the canvas stays true.
 
@@ -262,7 +262,7 @@ The first draft had this backwards. It carried only "lowest at least 55% of the 
 
 An earlier draft made this an eleventh archetype and called it the most dangerous in the catalog, because a rounded segment cap has a minimum drawable width, so a 4.1% value draws at 8% of the track. That is true and it is a rendering rule, not a form: square the caps, and print a numeral column that is authoritative so the bar is never read alone. Once those two things are done, a share of an entity's own denominator is an independent magnitude, which is exactly what a bar legitimately asserts, and the separate form was carrying one layout branch and a hazard.
 
-**Parameters.** `headline` (2 lines, ~20-24 chars each) · `subtitle` (1 line, <=46 chars, states the instrument and n) · `items` (4-8 of {label <=40 chars, value}) · `highlight_index` (integer, optional) · `source_name`.
+**Parameters.** Archetype value `ranked-bars`. `headline` (2 lines, ~20-24 chars each) · `sub` (1 line, <=46 chars, states the instrument and n) · `items` (4-11 of `label | value`, <=48 chars each) · `highlight` (1-based item number, optional) · `footer` in front matter, the source line.
 
 **Structure honesty.** Bars assert independent magnitudes. If the values are parts of a whole that must sum to 100, this form is wrong; the reference image itself has five values summing to 262 against a stated n of 178, which is defensible only because the survey allowed multiple answers and the subtitle says so.
 
@@ -294,7 +294,7 @@ Two confused labels, several dimensions, one row where both answer the same.
 
 **The shared-ground row must be load-bearing, not tautological.** "Both are called a pilot" satisfies the requirement and does none of its work. If the only honest overlap is that the two words exist, this is the wrong form.
 
-**Parameters.** `headline` (1 line, `A vs B` form) · `columns` (2-3 labels) · `rows` (5-7 of {label, kind, cells[]}) · `merged_row` (the shared-ground row, full width).
+**Parameters.** Archetype value `comparison-panel`. `headline` (1 line, `A vs B` form) · `sub` (1 line, optional) · `col1` and `col2` (each a `key: title` line opening its own `- ` bullet list, 5-7 rows, the two lists in the same order) · `verdict_label` and `verdict` (the shared-ground row, full width, optional pair).
 
 **Three columns are a parameter, not a second form**, and they cost something: the `A vs B` headline no longer writes itself, the shared-ground row has to be true of all three, and the straw-man risk this form already carries roughly doubles, because with three columns there is usually one the author does not respect.
 
@@ -318,7 +318,7 @@ The audience's mental model on top, the practitioner's underneath, drawn at the 
 
 **One clause from the first draft was too narrow and is removed.** It required the two models be "held by two different audiences." A before-and-after held by one team is structurally identical, same object, one-statement view against a four-statement view, and was excluded by a clause constraining who holds the belief rather than what shape it makes. The requirement is now that the two views be *attributable*, to an audience or to a past self.
 
-**Parameters.** `headline_naive` and `headline_real` (1 line each, <=36 chars, with one word emphasized in each) · `naive_callout` (2 lines, ~16 chars each) · `real_items` (4 single-line items) · `real_punchline` (1 item that deliberately breaks the format of the other four) · `divider_y_pct`.
+**Parameters.** Archetype value `perception-split`. `headline` (the claim both panels serve) · `naive_headline` and `real_headline` (1 line each, <=36 chars, with one word in `**bold**` in each) · `naive_statement` (<=60 chars, the single claim in the top panel) · `naive_callout` (<=40 chars, optional) · `items` (exactly 4, <=60 chars each) · `punchline` (<=60 chars, deliberately breaking the format of the other four).
 
 **Structure honesty.** **The asymmetry is the content.** If both halves get the same number of labels, the image reads as a neutral two-column comparison and there is no thesis left. This is the archetype's single load-bearing rule.
 
@@ -340,7 +340,7 @@ Jargon on the left as an everyday object, the real thing on the right, identical
 
 **Disqualifies.** Analogies that do not share a base noun. Any quantitative content, since there is no slot for a number. Terms that are sequential rather than parallel.
 
-**Parameters.** `headline` (1 line, with the first 1-2 words highlighted) · `subtitle` (1 line, <=52 chars, names the audience and the use) · `rows` (3-5 of {term <=14 chars, equation <=16 chars, bullets[2]}).
+**Parameters.** Archetype value `analogy-rows`. `headline` (1 line, with the first 1-2 words in `**bold**`) · `sub` (1 line, <=52 chars, names the audience and the use) · `items` (3-5 of `term | equation | fact; fact`, <=90 chars each, term <=14 and equation <=16).
 
 **Structure honesty.** An `=` sign asserts equivalence. These equations are editorial, not measured, and the layout offers nowhere to hedge. Surface all equations together for review before publish.
 
@@ -362,7 +362,9 @@ A flat set of peers, one tile each, in a grid.
 
 **Disqualifies.** Sequential or dependent items; a 3-across reading order puts step 4 under step 1. Hierarchies. Items that are shares of a whole. Items that are externally published works with a publisher and a title, which is §3.8; without this clause nine sourced items satisfy both forms, tie on deficits, and the tie-break picks the form with no fabrication gate. Fewer than 6 bodies the author can actually write, as distinct from 6 labels they can name, which is the deficit the count question does not detect.
 
-**Parameters.** `headline` (2 lines, line 2 shorter because a count badge occupies the rest of that row) · `badge` (2 lines, <=22 chars each, carries the count) · `items` (6-12 of {label <=13 chars, body <=121 chars}).
+**Parameters.** This signature has **two** archetype values, and the item count picks between them: `card-grid` for 4-10 items, drawn as equal rectangular cards two or three across; `icon-list` for 8-12, drawn as a denser two-column list with a monoline glyph per row. Both take `headline` · `sub` (1 line, optional) · `items` (of `label | body`, label <=13 chars, body <=121).
+
+**The count badge is gone. Recorded 2026-09-06.** `badge`, a second headline line carrying the item count, was a parameter of the retired HTML renderer and has no field in `render/imagegen/`. A spec that sets it prints it as an ordinary line of canvas text, which is not what it did before. Put the count in the `headline` or in `sub` instead. This is the only parameter in §3 that the renderer swap dropped outright rather than renamed.
 
 **Structure honesty.** A 3-across grid asserts that all twelve items are peers. Sequential processes break here, because a 3-across reading order puts step 4 directly under step 1. Hierarchies break, because twelve equal boxes deny the hierarchy.
 
@@ -382,7 +384,7 @@ Nine externally published items, grouped three-and-three-and-three under questio
 
 **Disqualifies.** A continuous argument. Ordered or interdependent items. Any item whose publisher or title cannot be verified; this form has the highest fabrication surface in the catalog and §4 governs it in full.
 
-**Parameters.** `headline` (2 lines, one highlighted) · `subtitle` (1 line, <=64 chars, states the count and the window) · `sections` (3 of {question <=36 chars, tint}) · `cards` (9 of {source_name, title, finding}).
+**Parameters.** Archetype value `sourced-shelf`. `headline` (2 lines, one phrase in `**bold**`) · `sub` (1 line, <=64 chars, states the count and the window) · `sections` (3 band questions, <=36 chars each, written as one `;`-separated line) · `items` (exactly 9 of `publisher | title | finding`, <=150 chars each, three per band in order) · `footer` in front matter, the source line.
 
 **Structure honesty.** The 3x3 grid asserts that all nine items are peers within their band and that the bands are parallel. A continuous argument, a process, or a single dataset all break here.
 
@@ -402,7 +404,9 @@ Ordered stages of one process, each opened up to show what is inside it.
 
 **Disqualifies.** Parallel rather than ordered items, which makes the taper lie. Wildly unequal stage sizes. Quantitative content. **A form that is the reader's industry stock graphic, rendered with no deviation.** Five numbered bands with chips inside them is the most-produced image in operations consulting, and the adversarial test that raised this is right that nothing else in this file catches it. The check is one question at the brief: does this exact form appear in the reader's feed weekly? If yes, the headline carries a claim rather than a label, or the form is not used.
 
-**Parameters.** `headline` (1-2 lines, numeral-first; the first draft said one line, which collides with §5.1's two-line allowance on any honest five-stage headline at the 40px cap height §1 requires) · `stages` (3-5 of {name, chips, tool_label}, where stages x chips <= 20 and every stage carries the same chip count) · `annotations` (<=3) · `tint_ramp` (one hue, one luminance step per stage, checked against the page background per §5.4, not five hues; stage index is an ordinal, and an ordinal is a luminance dimension rather than a hue dimension).
+**Parameters.** Archetype value `numbered-steps`. `headline` (1-2 lines, numeral-first; the first draft said one line, which collides with §5.1's two-line allowance on any honest five-stage headline at the 40px cap height §1 requires) · `sub` (1 line, optional) · `items` (3-6 of `name | detail | chip; chip; chip`, where stages x chips <= 20 and every stage carries the same chip count).
+
+**`tint_ramp` is not a field. Recorded 2026-09-06.** The one-hue-per-luminance-step rule below is still the rule, and it now reaches the image through the theme palette and the archetype recipe rather than through a per-spec parameter. Setting `tint_ramp:` in a spec does nothing; it is accepted and ignored so a spec written from the old vocabulary still renders.
 
 **Total chip ceiling: 20, and the count is fixed across stages.** Five stages at six components each is 30 chips, well past the point §5.5 warns about, and the form's own Breaks-when line forbids differing counts per band. Both are satisfied by fixing the count per render: 5 stages take 4 chips, 4 take 5, 3 take up to 6.
 
@@ -426,7 +430,9 @@ Many named items sorted into ordered strata, inside a shape whose width tracks t
 
 **Disqualifies.** Items carrying numbers. Temporal ordering. Strata whose item counts do not change monotonically. **Strata boundaries chosen by the engine to satisfy the monotonicity requirement.** The cut points must come from the material's own logic; a gate the matcher can satisfy by sliding its own parameters is not a gate.
 
-**Parameters.** `container` (enum: iceberg, pyramid, nested-arcs, bands) · `title_prefix` / `highlight_word` / `title_suffix` · `strata` (3-5 of {label, items[]}) · `tint_ramp` (one hue, one luminance step per stratum, checked against the page background per §5.4, never one hue per stratum) · `notes` (3-5, set in a typographically distinct voice) · `divider_style` per boundary.
+**Parameters.** Archetype value `stratified-container`. `headline` (the split title, with the emphasised word in `**bold**` rather than in three separate fields) · `container` (enum: iceberg, pyramid, nested-arcs, bands) · `items` (3-5 strata of `label | chip; chip; chip`, <=220 chars each) · `notes` (3-5 author notes, one `;`-separated line, set in a typographically distinct voice).
+
+**`tint_ramp` and `divider_style` are not fields.** Both are accepted and ignored. The luminance-ramp rule and the differing-boundary rule below still hold and now reach the image through the archetype recipe.
 
 **Structure honesty.** Nesting asserts containment. Depth asserts permanence. If the strata are peers rather than ordered, the container lies. **Item counts must track the container's width**: a shape that widens toward the bottom with equal counts per stratum is wallpaper behind three plain lists.
 
@@ -446,7 +452,7 @@ Three nested causal layers, split at the equator: the good version above, its fa
 
 **Disqualifies.** Layers that are peers rather than nested. Any number, unit, axis, or date. Item counts that do not increase strictly outward, which starves the rim and jams the core. Good and bad items in matching slots that are not semantic antonyms. More or fewer than 3 layers.
 
-**Parameters.** `headline_positive_word` / `headline_connector` / `headline_negative_phrase` · `layers` (3, ordinally numbered) · `positive_items` and `negative_items` per layer · `positive_ramp` / `negative_ramp`.
+**Parameters.** Archetype value `mirrored-rings`. `headline` (the whole split title in one field, the positive word in `**bold**`) · `good_label` and `bad_label` (the two equator labels) · `items` (exactly 3 rings, each `ordinal | good chip; good chip | bad chip; bad chip`, <=240 chars each, chip counts increasing strictly outward). `positive_ramp` and `negative_ramp` are accepted and ignored.
 
 **Structure honesty.** Ring area grows as the square of the radius, so the outer ring has roughly 3x the area of the core. Item counts must therefore increase outward, or the rim looks starved while the core is jammed shut.
 
@@ -472,7 +478,7 @@ Named parts of one stated whole, drawn as a single full-width stacked bar.
 
 **Disqualifies.** Values that do not sum to a stated whole. Parts drawn from differing denominators. More than 5 parts. An `Other` bucket larger than the second-largest named part, which means the real composition is unmeasured. **A stated n exceeding the sum of the plotted values with no remainder segment**, which is the reference set's own observed failure: seven bars summing to 35 against a stated population of 74, with no `other` and no note. Either draw the remainder or say "top 4 of n".
 
-**Parameters.** `headline` (states the contradiction, 3-8 words) · `subtitle` (1 line, states denominator, total, and period) · `expectation` (1 line, the belief being corrected) · `parts` (3-7 of {label <=24 chars, pct}) · `leader_index` · `source_name`.
+**Parameters.** Archetype value `composition-split`. `headline` (states the contradiction, 3-8 words) · `sub` (1 line, <=72 chars, states denominator, total, and period) · `expectation` (1 line, <=72 chars, the belief being corrected) · `items` (2-5 of `label | pct`, <=30 chars each) · `leader` (1-based item number of the leading segment) · `footer` in front matter, the source line.
 
 **Render.** One full-width horizontal stacked bar, the leading segment in the accent, the remainder in luminance steps of a single hue per §5.4. Labels below in a two-column list, never inside segments smaller than ~12%. **No pie and no donut.** A pie forces angular comparison, which people read badly, and a seven-segment donut with a legend is a design tell in its own right.
 
@@ -492,7 +498,7 @@ Many observations of one measure, plotted against the value everyone assumes.
 
 **Disqualifies.** Fewer than 8 observations, where individual dots read as a list rather than a distribution. No reference line, which leaves a cloud of dots asserting nothing. Observations drawn from different measures or units. A spread under 3x, where the strip is a thick dot.
 
-**Parameters.** `headline` (names the assumption the spread breaks) · `subtitle` (1 line, states the measure, n, and window) · `observations` (8-30 numbers) · `reference_value` and `reference_label` · `unit_suffix` · `anonymize` (bool) · `source_name`.
+**Parameters.** Archetype value `distribution-strip`. `headline` (names the assumption the spread breaks) · `sub` (1 line, <=60 chars, states the measure, n, and window) · `observations` (8-30 numbers, one `;`-separated line) · `reference_value` and `reference_label` (<=40 chars) · `unit` (suffix printed after each number) · `anonymize` (`true` suppresses the two end numbers) · `footer` in front matter, the source line.
 
 **Render.** One horizontal axis, one dot per observation with slight vertical jitter, a labeled vertical rule at the reference value, and the two extreme observations annotated. Nothing else.
 
@@ -514,7 +520,9 @@ A predicted value, an actual value, and the named contributions that reconcile t
 
 **Disqualifies.** Contributions that leave a residue larger than the stated rounding tolerance **and** no `residual_label` to draw it with. An unexplained residue drawn as if it were explained is what makes a waterfall dishonest; an explicitly drawn one is the honest case and the parameters support it. More than 6 contributions, where the bars fall below thumbnail legibility. A gap under ~10% of the base, where every intermediate bar is a sliver. No contribution the author found surprising, which means this is a report rather than a post.
 
-**Parameters.** `headline` (names the gap or the surprise) · `subtitle` (period, unit, and what the two endpoints are) · `start` ({label, value}) · `contributions` (3-6 of {label <=20 chars, signed_value}) · `end` ({label, value}) · `payoff_index` · `residual_label` (required if contributions do not sum exactly) · `source_name`.
+**Parameters.** Archetype value `variance-bridge`. `headline` (names the gap or the surprise) · `sub` (1 line, <=72 chars, period, unit, and what the two endpoints are) · `start` and `end` (each `label | value`) · `items` (3-6 contributions of `label | signed value`, <=26 chars each) · `payoff` (1-based item number of the payoff bar) · `footer` in front matter, the source line.
+
+**`residual_label` is not a field.** The rule it served — that contributions failing to sum exactly must name the residue rather than hide it — is unenforced by the renderer now and belongs to whoever writes the spec. Carry the residue as its own `items` entry.
 
 **Render.** Floating bars stepping from the start value to the end value, positive contributions in one hue and negative in another, the payoff bar in the accent. Connector rules between bar tops. The start and end bars are grounded at zero; everything between floats.
 
@@ -536,7 +544,7 @@ Many items crossed on two independent dimensions.
 
 **Disqualifies.** **An empty quadrant.** If one is empty the two axes are not independent, and the honest form is a ranked list on whichever axis is doing the work. **A placement rule the author cannot state.** Unstated criteria reproduce §3.10's failure exactly, where the reader litigates placement instead of absorbing the sort. **A top-right quadrant containing only the author's own position**, which is the form's signature dishonesty and the reason it has a bad reputation: axis selection is unfalsifiable, so a 2x2 can be reverse-engineered from its conclusion and no design gate can see it.
 
-**Parameters.** `headline` · `subtitle` (1 line, carries the placement rule) · `x_axis` ({low_label, high_label}) · `y_axis` ({low_label, high_label}) · `quadrant_labels` (4, <=3 words each) · `items` (6-12 of {label <=20 chars, x, y}) · `highlight_index` · `placement_rule` (1 sentence, rendered in the subtitle).
+**Parameters.** Archetype value `quadrant-map`. `headline` · `sub` (1 line, <=120 chars, and it carries the placement rule, which has no field of its own) · `x_axis` and `y_axis` (each `low label | high label`) · `quadrants` (4 names, <=3 words each, one `;`-separated line) · `items` (6-12 of `label | x | y`, <=30 chars each) · `highlight` (1-based item number, optional).
 
 **Thumbnail contract.** The cross, the four quadrant labels, and the cluster silhouette. **Every item label dies**, which means the quadrant names carry the entire payload. Most real quadrant maps fail this, because most put the interest in item placement. If the four names are not themselves the claim, this is the wrong form.
 
@@ -554,11 +562,27 @@ Root cause to mechanism to symptom to the cost somebody feels.
 
 **Disqualifies.** Correlation presented as causation with no stated mechanism. More than 4 links, where the chain becomes a process diagram and the necessity claim dilutes into a sequence. **Convergence: several independent causes feeding one outcome.** A chain asserts a single thread, and a forecast miss with four contributing drivers is a variance bridge (§3.14), not a chain. Without this clause the chain survives on variance material and the counted question invites the user to invent a single-thread story. A terminal node that is a category rather than a felt cost; "poor data quality" is not a cost, "the planner rebuilds the forecast by hand every Monday" is. Branching, which is a decision tree and is refused per §9.
 
-**Parameters.** `headline` · `nodes` (4-5 of {label <=17 chars, gloss <=60 chars}) · `terminal_cost` · `break_point_index` · `break_label`.
+**Parameters.** Archetype value `causal-chain`. `headline` · `sub` (1 line, optional) · `items` (3-4 of `label | gloss`, <=80 chars each, label <=17) · `terminal_cost` (`label | gloss`, <=80 chars, the distinct terminal node) · `break_after` (1-based item number the chain breaks after) · `break_label` (what the break asserts).
+
+**The item count is 3-4, not 4-5.** `terminal_cost` is its own field rather than the last item, so a four-node chain is three `items` plus the terminal, and a five-node chain is four plus the terminal. `--check` counts `items` alone and will refuse a spec that puts all five in the list.
 
 **Thumbnail contract.** Headline, the chain silhouette, and the node labels, all of which survive at 220px because there are at most five of them. This form has one of the strongest thumbnail contracts in the catalog, which is most of the argument for building it early.
 
 **Structure honesty.** An arrow asserts necessity. If the author would not defend "remove X and Y does not happen," the arrow is a sequence arrow wearing a causal one's clothes.
+
+---
+
+### 3.17 Three archetypes the renderer has and this catalog does not
+
+Recorded 2026-09-06, during the audit that corrected every parameter name above. `render/imagegen/` ships **nineteen** infographic archetypes; §3.1 through §3.16 describe **sixteen**. The three with no signature here are:
+
+| Archetype | Required fields | What it draws |
+| :- | :- | :- |
+| `funnel` | `headline`, `items` (4-6) | Bands narrowing top to bottom. The narrowing claims filtering, so each band must be visibly narrower and the widths must track the values where values are given. |
+| `annotated-diagram` | `headline`, `center`, `items` (4-6) | One central labelled object with leader lines to short titled callouts. Leader lines start inside the shape and cross its edge. |
+| `hybrid-playbook` | `headline`, `stats`, `items` | Two to four hero numbers across the top over a grid of titled sections. The numbers carry the visual weight. |
+
+**These have no input signature, no disqualifiers, and no thumbnail contract**, which means §2.3's sixteen-step selection procedure cannot select them and §2.5's clearance filter cannot screen them. They are reachable only by naming the archetype directly. Treat them as unselectable until someone writes them a §3 entry; the gap is recorded here rather than papered over, because a catalog that silently omits three of its own forms is how §2.3 starts returning a refusal on material that has a home.
 
 ---
 

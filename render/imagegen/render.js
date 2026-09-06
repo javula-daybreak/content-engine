@@ -163,7 +163,9 @@ function report(findings) {
 
 function runCheck(format, meta, blocks, theme, specDir) {
   const findings = P.checkSpec(format, meta, blocks);
-  themeReferences(theme); // dies naming the key if a referenced file is absent
+  // A themeless --check is a pure spec check, which is the whole point of
+  // running it before a profile exists or before any key is configured.
+  if (theme) themeReferences(theme); // dies naming the key if a file is absent
   for (const b of blocks) {
     if (!b.image) continue;
     const abs = path.resolve(specDir, b.image);
@@ -185,7 +187,7 @@ function runCheck(format, meta, blocks, theme, specDir) {
 
 async function infographic(specPath, opts) {
   const { meta, blocks } = P.parseSpec(fs.readFileSync(specPath, 'utf8'));
-  const theme = loadTheme(opts.profile);
+  const theme = opts.check && !opts.profile ? null : loadTheme(opts.profile);
   const errors = runCheck('infographic', meta, blocks, theme, path.dirname(specPath));
   if (opts.check) process.exit(errors ? 1 : 0);
   if (errors) die('refusing to spend an API call on a spec with errors.');
@@ -200,7 +202,12 @@ const slideFile = (outPdf, i) =>
 async function carousel(specPath, opts) {
   const specDir = path.dirname(specPath);
   const { meta, blocks } = P.parseSpec(fs.readFileSync(specPath, 'utf8'));
-  const theme = loadTheme(opts.profile);
+  const theme = opts.check && !opts.profile ? null : loadTheme(opts.profile);
+
+  if (opts.check) {
+    process.exit(runCheck('carousel', meta, blocks, theme, specDir) ? 1 : 0);
+  }
+
   const out = guardOut(opts.profile, opts.out);
 
   if (opts.assemble) {
@@ -210,9 +217,9 @@ async function carousel(specPath, opts) {
     return assemblePdf(files, out);
   }
 
-  const errors = runCheck('carousel', meta, blocks, theme, specDir);
-  if (opts.check) process.exit(errors ? 1 : 0);
-  if (errors) die('refusing to spend API calls on a spec with errors.');
+  if (runCheck('carousel', meta, blocks, theme, specDir)) {
+    die('refusing to spend API calls on a spec with errors.');
+  }
 
   const key = apiKey();
   const themeRefs = themeReferences(theme);
@@ -318,9 +325,12 @@ async function main(argv) {
   const spec = opts.positional[1];
   if (!spec) die(`${cmd} needs a spec path\n\n${USAGE}`);
   if (!fs.existsSync(spec)) die(`spec not found: ${spec}`);
-  if (!opts.profile) die('--profile is required');
-  if (!fs.existsSync(opts.profile)) die(`--profile not found: ${opts.profile}`);
-  if (!opts.out) die('--out is required');
+  // --check spends nothing and paints nothing, so it needs neither.
+  if (!opts.check) {
+    if (!opts.profile) die('--profile is required');
+    if (!opts.out) die('--out is required');
+  }
+  if (opts.profile && !fs.existsSync(opts.profile)) die(`--profile not found: ${opts.profile}`);
 
   if (cmd === 'infographic') return infographic(spec, opts);
   return carousel(spec, opts);

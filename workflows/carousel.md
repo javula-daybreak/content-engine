@@ -40,11 +40,11 @@ headline: One line with **one accent span.**
 
 | Rule | Detail |
 | :- | :- |
-| Fields | Every archetype's required and optional fields are in `render/carousel/reference/archetypes.md`. Not restated here. |
+| Fields | Every archetype's required and optional fields are in `render/imagegen/reference/prompts-carousel.md`, and the code that enforces them is `REQUIRED.carousel` in `render/imagegen/prompt.js`. Not restated here. **Changed 2026-09-06:** this row pointed at `render/carousel/reference/archetypes.md`, which documents the retired HTML templates and is no longer the contract. |
 | Lists | `- ` lines attach to the open list field (`items`, or `left` / `right`). `steps` items use a pipe: `Label \| detail`. |
 | Accent | `**bold**` in a headline names that phrase as the accent phrase, one span per headline, and nothing else on the slide may take the accent. **`bg: dark` / `bg: light` is now inert**: the treatment is fixed per archetype in the prompt recipe, dark on `cover` and `cta` and light everywhere else. A per-slide override would need a recipe parameter and no run has wanted one yet. |
 | Furniture | The footer line and any wordmark are described to the model per slide. **The page counter and the progress bar are gone**: a generative model cannot be trusted to count to eight, and a wrong counter on slide 6 is the exact "artifact that would embarrass the post" the visual check exists to catch. If they are wanted back, they belong in a post-pass over the PNGs, not in a prompt. |
-| Flags | `--check` validates spec and theme with no network and no cost, `--cover` / `--rest` / `--assemble` are the three generation phases, `--slide N` regenerates one slide, `--note "<constraint>"` folds a failed check's correction into the prompt. `--profile` and `--out` are required. |
+| Flags | `--check` validates the spec with no network and no cost, `--cover` / `--rest` / `--assemble` are the three generation phases, `--slide N` regenerates one slide, `--note "<constraint>"` folds a failed check's correction into the prompt. `--profile` and `--out` are required to generate; **`--check` alone needs neither**, so a spec can be validated before a profile exists. Pass `--profile` with it to check the theme's reference files too. |
 
 ## Step 4: the draft as slide beats
 

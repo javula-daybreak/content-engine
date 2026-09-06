@@ -17,10 +17,21 @@ is now in `archive/2026-09-06-html-renderers/`. Throughout, `<P>` is
 
 **`content-engine-VISUALS.md` §2 is the procedure and this file does not restate
 it.** Read it and run it: §2.3's sixteen steps, §2.5's clearance filter, §2.4's
-refusal, §2.1's archetype lock. Its §3 catalog is the authority on what each
-signature requires and what disqualifies it, and it outranks
+refusal, §2.1's archetype lock. Its §3 catalog is the authority on **which form
+to pick**: the input signature, the disqualifiers, the structure-honesty claim
+and the thumbnail contract. On that question it outranks
 `render/imagegen/reference/prompts-infographic.md`, which describes prompts
 rather than signatures.
+
+**The precedence is scoped to selection, and that scope is load-bearing.
+Corrected 2026-09-06.** It used to read "the authority on what each signature
+requires," unscoped, which handed §3 authority over **field names** as well.
+Twelve of the sixteen signatures named fields the renderer refuses — `subtitle`
+for `sub`, `rows` and `parts` and `cards` and `nodes` for `items`,
+`source_name` for `footer` — so following the precedence rule as written
+produced a spec that exits 1. The names are corrected in §3 now, but the rule
+still needs its scope: **on field names, budgets and item counts, the code
+wins**, and `--check` is the arbiter. Run it before drafting a single item.
 
 Two things this file owns.
 

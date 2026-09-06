@@ -223,6 +223,50 @@ const CASES = {
       .some(f => /needs one of stat or headline/.test(f.msg)));
   },
 
+  'a layout directive becomes an instruction, never a line of canvas text'() {
+    // Until 2026-09-06 these seven were not in DIRECTIVE_KEYS, so `highlight: 1`
+    // printed the literal string `HIGHLIGHT: "1"` onto seven of the nineteen
+    // shipped examples, and `container:` was dropped without ever reaching the
+    // model. Both halves are asserted here.
+    const block = {
+      archetype: 'ranked-bars', headline: 'A claim',
+      highlight: '1', break_after: '2', y_max: '44', ticks: '5',
+      unit: 'hues', leader: '3', payoff: '6', container: 'iceberg',
+    };
+    const joined = P.textLines(block).lines.join('\n');
+    for (const k of ['HIGHLIGHT', 'BREAK AFTER', 'Y MAX', 'TICKS', 'UNIT',
+      'LEADER', 'PAYOFF', 'CONTAINER']) {
+      assert.ok(!joined.includes(k), `${k} reached the canvas as text`);
+    }
+    const say = P.directiveLines(block).join(' ');
+    assert.ok(/Item 1 is the one emphasised object/.test(say));
+    assert.ok(/tops out at 44/.test(say));
+    assert.ok(/shape is: iceberg/.test(say));
+    assert.ok(/Suffix every number printed on the plot with "hues"/.test(say));
+  },
+
+  'anonymize suppresses the numbers only when it is true'() {
+    assert.deepEqual(P.directiveLines({ anonymize: 'no' }), []);
+    assert.ok(/Print no numeric values/.test(
+      P.directiveLines({ anonymize: 'true' })[0]));
+  },
+
+  'every shipped example renders with no directive leaking onto the canvas'() {
+    const fs = require('fs');
+    const dir = __dirname + '/../../infographic/examples';
+    for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.md'))) {
+      const { blocks } = P.parseSpec(fs.readFileSync(dir + '/' + f, 'utf8'));
+      for (const b of blocks) {
+        for (const line of P.textLines(b).lines) {
+          const key = line.slice(0, line.indexOf(':')).toLowerCase()
+            .replace(/ \d+$/, '').replace(/ /g, '_');
+          assert.ok(!P.DIRECTIVE_KEYS.has(key),
+            `${f}: directive '${key}' reached the canvas as text`);
+        }
+      }
+    }
+  },
+
   'every archetype the checker knows has a prompt recipe'() {
     for (const format of ['infographic', 'carousel']) {
       for (const arch of Object.keys(P.REQUIRED[format])) {

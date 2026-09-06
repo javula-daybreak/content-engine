@@ -1,7 +1,9 @@
 # Content Engine
 
+Run this **from inside this folder**, the one holding the README you are reading:
+
 ```
-cp -R "content engine" ~/.claude/skills/content-engine
+mkdir -p ~/.claude/skills && cp -R . ~/.claude/skills/content-engine
 /content-engine setup
 ```
 
@@ -9,6 +11,18 @@ That is the whole install. **There is no published remote yet**, so this is a
 copy of the directory rather than a clone; the line was `git clone <url>` until
 2026-08-20, and a literal `<url>` in the one file that is supposed to be the
 whole explanation is the explanation failing.
+
+**Corrected 2026-09-06, and it was the most-hit defect in the engine.** This
+read `cp -R "content engine" ~/.claude/skills/content-engine`, a path resolved
+against the *parent* of this folder, with no line saying so. Every one of six
+dogfood reports hit it, two of three testers were stopped dead by it, and the
+next line — `/content-engine setup` — then failed with `Unknown skill`, so a
+six-line README had both of its lines broken. `cp -R .` resolves against where
+you already are.
+
+**Copy it again after every change.** `/content-engine` reads the copy under
+`~/.claude/skills/`, never this folder, so edits here do nothing until you
+re-run the line above.
 
 The interview is the only setup step, and it is a conversation rather than a
 form. Nothing is hand-edited to get started and no connector is ever required.

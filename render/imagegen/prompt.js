@@ -152,9 +152,33 @@ const RECIPES = {
 const DIRECTIVE_KEYS = new Set(['archetype', 'theme', 'aspect', 'title', 'bg',
   'scrim', 'image', 'track', 'container', 'anonymize', 'divider_y_pct',
   'tint_ramp', 'positive_ramp', 'negative_ramp', 'divider_style',
-  'y_axis_max', 'y_tick_count']);
+  'y_axis_max', 'y_tick_count',
+  // The seven the shipped examples actually use. Missing here until 2026-09-06,
+  // so `highlight: 1` printed the literal line `HIGHLIGHT: "1"` onto the canvas
+  // on seven of the nineteen examples. The five names above them are VISUALS §3
+  // vocabulary that no example writes: accepted and ignored, so a spec written
+  // from the old doc degrades to a plain render instead of a captioned one.
+  'highlight', 'leader', 'payoff', 'break_after', 'y_max', 'ticks', 'unit']);
 
 const isDirective = k => DIRECTIVE_KEYS.has(k) || k.endsWith('_index');
+
+// A directive is not canvas text, but most of these still have to reach the
+// model or the layout they name never happens: `container: iceberg` was being
+// dropped, so every stratified-container render got the generic recipe. One
+// sentence each, emitted under LAYOUT rather than under the verbatim contract.
+const DIRECTIVE_TEXT = {
+  highlight: v => `Item ${v} is the one emphasised object: set it in the accent colour and leave every other item in ink.`,
+  leader: v => `Segment ${v} is the leading share: set it in the accent colour.`,
+  payoff: v => `Bar ${v} is the payoff bar: set it in the accent colour and seat it on the baseline, not floating.`,
+  break_after: v => `Break the chain after link ${v}: that one gap is where the sequence stops, and it carries the break label.`,
+  container: v => `The containing shape is: ${v}.`,
+  y_max: v => `The value axis tops out at ${v}, above the highest datum, never equal to it.`,
+  ticks: v => `Draw ${v} value-axis gridlines, each with its number.`,
+  unit: v => `Suffix every number printed on the plot with ${JSON.stringify(String(v))}.`,
+  anonymize: v => (/^(true|yes|1)$/i.test(String(v).trim())
+    ? 'Print no numeric values on the plot: the shape of the spread is the whole claim.'
+    : null),
+};
 
 // Canvas text in a stable order, so a prompt is reproducible from a spec and a
 // diff between two prompts is readable. Unlisted keys follow in spec order.
@@ -198,6 +222,20 @@ function renderItem(raw) {
     }
   });
   return (icon ? `glyph ${icon[1]}, ` : '') + out.join('; ');
+}
+
+/** A block's layout directives, as instruction lines. Never canvas text. */
+function directiveLines(block) {
+  const out = [];
+  for (const k of Object.keys(block)) {
+    const fn = DIRECTIVE_TEXT[k];
+    if (!fn) continue;
+    const v = block[k];
+    if (v == null || v === '') continue;
+    const line = fn(v);
+    if (line) out.push(line);
+  }
+  return out;
 }
 
 /** A block's canvas text, as prompt lines, plus every accent phrase found. */
@@ -288,6 +326,7 @@ function buildPrompt(opts) {
   p.push('');
   p.push(`LAYOUT: ${arch}`);
   p.push(recipe);
+  p.push(...directiveLines(block));
   p.push('Fill the frame. This is a dense, information-rich editorial graphic, not a minimal poster.');
   p.push('');
   p.push('TEXT ON THE CANVAS');
@@ -476,4 +515,5 @@ function checkSpec(format, meta, blocks) {
 module.exports = {
   parseSpec, buildPrompt, checkSpec, splitAccent, renderItem, textLines,
   faceAdjective, RECIPES, REQUIRED, BUDGETS, LIST_KEYS, CANVAS_W, CANVAS_H,
+  directiveLines, DIRECTIVE_KEYS,
 };
