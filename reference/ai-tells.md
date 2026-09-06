@@ -110,6 +110,11 @@ sure, it's complicated" does not fire. Section 9's maintenance rule is that
 precision can only decay, and a miss you can still catch costs less than a
 rewrite of good writing on every future draft forever.
 
+**Negative listing is the same tell in a different shape**, folded in here
+2026-09-06 rather than given its own id: "Not a strategy. Not a plan. A wish."
+is the antithesis construction run three times instead of once, and the fix is
+the same one, state the surviving term and drop the rest.
+
 ### unearned-rule-of-three
 
 **Fires on:** a list of exactly three where the content did not require three.
@@ -128,8 +133,10 @@ a word or two of the same length.
 
 ### rhetorical-fragment
 
-**Fires on:** "The result?", "The kicker?", "Here's the thing", and the shape:
-any standalone one-word or two-word line ending in `?` or `:`.
+**Fires on:** "The result?", "The kicker?", "Here's the thing", "What if I told
+you", "Plot twist:", "Think about it:", "Here's what nobody tells you", "What
+most people get wrong", "The part everyone misses", and the shape: any
+standalone one-word or two-word line ending in `?` or `:`.
 **Owner:** engine (`rhetorical-fragment`).
 **Redraft:** fold it into the sentence that follows. The line is a drum roll,
 and the sentence after it is the content.
@@ -137,13 +144,25 @@ and the sentence after it is the content.
 A numeral anywhere on the line disqualifies it, so a date used as a section
 marker is not read as rhetoric.
 
+**The six phrases added 2026-09-06** are no-ai-slop's rhetorical setups and
+faux-insight setups. Both flatter the reader with a promised reveal instead of
+making it, which is the same drum roll the original three catch, so they share
+the id rather than starting a new one.
+
 ### restating-close
 
 **Fires on:** a final paragraph that repeats the post's claim in different
-words and adds nothing.
+words and adds nothing, **or** a final line that turns the point into a cute
+metaphor, aphorism, or mic-drop instead of repeating it. Folded into one id
+2026-09-06: a restated close and a fake-profound kicker are both a post
+outstaying its own ending, one by echo and one by flourish.
 **Owner:** model.
-**Redraft:** the post ends one paragraph earlier and is better for it. Bound 2
-never reaches this one: it is scoped to repairs and this is not one.
+**Redraft:** the post ends one paragraph earlier and is better for it. Do not
+rewrite the kicker into a better metaphor and do not preserve its rhythm,
+delete it and end on the clearest concrete sentence already in the draft. If
+the ending needs more closure after that, add a plain takeaway or next action,
+never a new flourish. Bound 2 never reaches this one: it is scoped to repairs
+and this is not one.
 
 ### engagement-bait-close
 
@@ -169,6 +188,30 @@ where that number is two or more.
 The two-line floor is deliberate. A post of one-line paragraphs throughout is a
 documented human habit, named in `inspiration.md` as a usable extraction, and
 firing on it would strike a real style as a machine artifact.
+
+### colon-reveal
+
+**Fires on:** a noun phrase, a colon, and a lowercase dramatic reveal, sitting
+inside running prose rather than on its own line. "The detail that makes it
+work: a separate agent grades it." Distinct from `rhetorical-fragment`, which
+is the same drama on a standalone line; this is the same drama mid-sentence.
+**Owner:** model.
+**Redraft:** rewrite as a plain sentence. "A separate agent does the grading,
+which is what makes it work." Colons stay for lists, labels, and quotes, and
+the word after one is sentence case unless grammar, a proper noun, a title, or
+code requires otherwise.
+
+### dramatic-fragmentation
+
+**Fires on:** a run of clipped fragments strung together for artificial punch,
+"X. And Y. And Z." or a paragraph closing on "That's it. That's the whole
+thing." Distinct from `no-fragments`, which flags the absence of any fragment;
+this flags fragments used as a rhythm crutch rather than as one earned beat.
+**Owner:** model.
+**Redraft:** write it in complete sentences. A fragment earns its place when it
+lands once, not when it is the paragraph's whole structure.
+
+Added 2026-09-06, from no-ai-slop.
 
 ---
 
@@ -211,8 +254,8 @@ suppressible per profile for the same reason too.
 
 ### banned-lexicon
 
-**Fires on:** the nineteen terms in section 9. Single words match with suffixes,
-so "leveraged" and "unpacking" both fire. Phrases match literally.
+**Fires on:** the terms below. Single words match with suffixes, so
+"leveraged" and "unpacking" both fire. Phrases match literally.
 **Owner:** engine (`banned`).
 **Repair:** the plain word.
 
@@ -233,20 +276,73 @@ so "leveraged" and "unpacking" both fire. Phrases match literally.
 | no-brainer | obvious |
 | double down | commit harder, spend more on |
 | moving the needle | changing the number |
+| foster | build, encourage |
+| utilize | use |
+| facilitate | help, run |
+| empower | let, give the ability to |
+| streamline | simplify, cut a step |
+| cutting-edge | new, latest, name what it does |
+| paradigm shift | name what changed |
+| beacon | example, model |
+| multifaceted | name the sides that matter |
+| meticulous | careful, thorough |
+| intricate | detailed, complex |
+| paramount | critical, the top priority |
+| transformative | name what changed |
+| elevate | raise, improve |
+| embark | start |
+| supercharge | speed up, boost |
+| harness | use |
+| ever-evolving | changing |
 | at the end of the day | delete |
 | in today's fast-paced world | delete |
 | the reality is | delete |
 | let that sink in | delete |
+| this is huge | delete |
+| this changes everything | delete |
+| when it comes to | delete |
+| at its core | delete |
+| in the age of | delete |
+| in the world of | delete |
+| in terms of | delete |
+| with regard to | delete |
+| in order to | delete |
+| going forward | delete |
 
-The last four are deleted rather than substituted, and that is not a bound 2
-violation. They carry no propositional content, so nothing is subtracted with
-them: the sentence means exactly what it meant before.
+The terms marked delete are deleted rather than substituted, and that is not a
+bound 2 violation. They carry no propositional content, so nothing is
+subtracted with them: the sentence means exactly what it meant before.
+
+**The last twenty-six rows were added 2026-09-06**, folding in the globally
+installed no-ai-slop skill's banned-outright list and its often-empty-phrases
+list as the zero-tolerance foundation this file already commits to. Any of
+them that overfires on a real person's writing is caught the same way every
+other row here is, by `gate --negative` at setup and suppressed per profile in
+`gate-calibration.md`, never struck from the shared list.
 
 **The protected-span carve-out matters most here.** "Double down", "moving the
 needle", "navigate" and "leverage" are all on this list and all appear in how
 supply chain operators actually talk. A quoted instance is reported and left
 alone. A silently edited quote from a named person is section 14's most
 important rule broken by this file's own mechanism.
+
+### puffery-attribution
+
+**Fires on:** "marks a pivotal moment", "plays a vital role", "solidifies its
+position", "underscores its significance", "experts agree", "industry reports
+suggest", "widely regarded as", "studies show".
+**Owner:** engine (`puffery-attribution`).
+**Redraft:** state the fact and let the reader judge whether it matters, or
+name the source. "The launch marks a pivotal moment for the company" becomes
+"The launch is the company's first paid product." "Studies show adoption is
+rising" becomes naming the study, or cutting the claim if there is no source to
+name.
+
+Added 2026-09-06 from no-ai-slop's importance puffery and weasel attribution.
+Neither is a plain word swap, unlike `banned-lexicon`: the fix depends on
+whether a source is nameable, which is why this is its own tag rather than one
+more banned-lexicon row, and why it carries `action: redraft` rather than
+`rewrite`.
 
 ### not-only-but-also
 
@@ -261,6 +357,36 @@ the drifted forms "but we also" and "but they also".
 **Owner:** both (`hedged-opener`). Those two are literal. The open category,
 every construction that apologises before making a claim, is yours.
 **Redraft:** delete the hedge and keep the claim. The claim was the sentence.
+
+**The open category widened 2026-09-06** to also cover interpretive
+metadiscourse: a line that steps outside the subject to tell the reader what
+to notice or how much weight to give it, "That last part matters more than it
+sounds," "The key point is," "As you can see," a redundant "in other words."
+Same judgment, a construction doing the reader's thinking for them, and the
+same fix, delete the aside if the point is already clear, or replace it with
+support the content is actually missing.
+
+### synonym-cycling
+
+**Fires on:** rotating words for style where the clear one should repeat. "The
+agent reviews the draft. The assistant scores the piece. The tool suggests
+fixes" names one thing three ways.
+**Owner:** model.
+**Redraft:** pick the right word and repeat it. "The agent reviews the draft,
+scores it, and suggests fixes."
+
+### superficial-analysis
+
+**Fires on:** a trailing `-ing` clause that gestures at meaning instead of
+supplying it, "highlighting," "underscoring," "reflecting," "showcasing." "The
+launch adds file search, highlighting the team's commitment to better
+workflows" names a virtue instead of a mechanism.
+**Owner:** model.
+**Redraft:** replace the clause with the actual mechanism or consequence. "The
+launch adds file search, so users can find old drafts without leaving the
+editor."
+
+Both added 2026-09-06, from no-ai-slop.
 
 ---
 
@@ -385,6 +511,20 @@ one repair against bound 3's cap.
 
 Cannot separate a header from a line of proper nouns, so a name list is a known
 false positive. Raise the ratio if that fires in practice.
+
+### formatting-slop
+
+**Fires on:** decoration standing in for content, bold sprinkled mid-sentence
+for emphasis, a bullet list where two sentences of prose would read better, a
+header over a two-sentence section. Distinct from `emoji-bullets`,
+`hashtag-stack`, and `title-case-header` above, which are the mechanical forms
+of the same family; this is the remainder, which has no literal string to
+match on.
+**Owner:** model.
+**Redraft:** drop the decoration and let the content carry the emphasis.
+Format follows content, it does not stand in for it.
+
+Added 2026-09-06, from no-ai-slop.
 
 ---
 
@@ -605,3 +745,20 @@ same pattern re-adds it, and the reason it failed is gone.
   which tells a run something is wrong and not what to do about it, and kept
   the only tell that is a deletion invisible to bound 3's arithmetic. No rule
   changed about when it fires.
+- **2026-09-06.** No-ai-slop, the globally installed editing skill, folded in
+  as this file's foundation rather than left to run alongside it. It is a
+  general-purpose human-editor pass with no per-profile calibration and no
+  protected-span or voice.md precedence of its own; this file already had a
+  stricter version of most of what it names, so the merge is one-directional,
+  its patterns into this table, never this table's precedence rules loosened
+  to match it. Six new ids: `puffery-attribution` (engine, its own literal
+  phrases), `synonym-cycling`, `superficial-analysis`, `colon-reveal`,
+  `formatting-slop`, `dramatic-fragmentation` (all model, no literal form to
+  match on). Twenty-six terms and phrases added to `banned-lexicon`. Six
+  phrases added to `rhetorical-fragment`. `antithesis`, `restating-close`, and
+  `hedged-opener` each had their model-judged open category widened rather
+  than split, where no-ai-slop's version was the same judgment in a different
+  shape. Nothing existing was loosened, struck, or made suppressible that
+  was not already: `voice.md` still wins, bound 4's protected spans still hold,
+  and every new engine-owned row is caught by the same `gate --negative`
+  calibration as the rest of the table.

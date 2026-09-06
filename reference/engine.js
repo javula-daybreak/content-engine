@@ -199,6 +199,19 @@ const TELLS = [
   { id: 'nominalisation-rate', owner: 'engine', tag: 'nominalisation-rate', action: 'redraft' },
   { id: 'clearance', owner: 'model', tag: null, action: 'reject' },
   { id: 'private-terms', owner: 'engine', tag: 'private-terms', action: 'reject' },
+  // 2026-09-06: no-ai-slop incorporation. The globally-installed skill of that
+  // name is a general-purpose human-editor pass, and this repo already had a
+  // stricter, per-profile-calibrated version of most of it. These six rows are
+  // the patterns it named that had no home here yet. Literal forms went into
+  // BANNED and PHRASED under existing or new tags, same as every tell above;
+  // the remaining five are judgment calls with no reliable literal form, which
+  // is exactly what owner: model already means in this table.
+  { id: 'puffery-attribution', owner: 'engine', tag: 'puffery-attribution', action: 'redraft' },
+  { id: 'synonym-cycling', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'superficial-analysis', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'colon-reveal', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'formatting-slop', owner: 'model', tag: null, action: 'redraft' },
+  { id: 'dramatic-fragmentation', owner: 'model', tag: null, action: 'redraft' },
 ];
 
 const tellById = new Map(TELLS.map(x => [x.id, x]));
@@ -238,6 +251,21 @@ const BANNED = [
   'at the end of the day', 'game-changer', 'no-brainer', 'double down',
   'moving the needle', "in today's fast-paced world", 'the reality is',
   'let that sink in',
+  // 2026-09-06: no-ai-slop's banned-outright list, minus the terms already
+  // above. Same treatment: single words match with suffixes, phrases match
+  // literally.
+  'foster', 'utilize', 'facilitate', 'empower', 'streamline', 'cutting-edge',
+  'paradigm shift', 'beacon', 'multifaceted', 'meticulous', 'intricate',
+  'paramount', 'transformative', 'elevate', 'embark', 'supercharge', 'harness',
+  'ever-evolving',
+  // Carries no propositional content, so deleted rather than substituted,
+  // same reasoning as "let that sink in" above.
+  'this is huge', 'this changes everything',
+  // no-ai-slop's remaining often-empty phrases, not already covered by a
+  // hedged-opener or announcement entry. Deleted, not substituted: each is
+  // pure throat-clearing around a claim that stands fine on its own.
+  'when it comes to', 'at its core', "in the age of", 'in the world of',
+  'in terms of', 'with regard to', 'in order to', 'going forward',
 ];
 
 // Section 9's announcement register. Literal strings only. The announcement
@@ -264,6 +292,26 @@ const PHRASED = [
   { term: 'the result?', tag: 'rhetorical-fragment' },
   { term: 'the kicker?', tag: 'rhetorical-fragment' },
   { term: "here's the thing", tag: 'rhetorical-fragment' },
+  // 2026-09-06: no-ai-slop's rhetorical and faux-insight setups. Same remedy
+  // as the three above, drop the drum roll and state the claim, so they join
+  // the same tag rather than mint a new one.
+  { term: 'what if i told you', tag: 'rhetorical-fragment' },
+  { term: 'plot twist:', tag: 'rhetorical-fragment' },
+  { term: 'think about it:', tag: 'rhetorical-fragment' },
+  { term: "here's what nobody tells you", tag: 'rhetorical-fragment' },
+  { term: 'what most people get wrong', tag: 'rhetorical-fragment' },
+  { term: 'the part everyone misses', tag: 'rhetorical-fragment' },
+  // 2026-09-06: no-ai-slop's importance puffery and weasel attribution. New
+  // tag: the remedy is "state the fact plainly" or "name the source", neither
+  // of which matches an existing tag's fix.
+  { term: 'marks a pivotal moment', tag: 'puffery-attribution' },
+  { term: 'plays a vital role', tag: 'puffery-attribution' },
+  { term: 'solidifies its position', tag: 'puffery-attribution' },
+  { term: 'underscores its significance', tag: 'puffery-attribution' },
+  { term: 'experts agree', tag: 'puffery-attribution' },
+  { term: 'industry reports suggest', tag: 'puffery-attribution' },
+  { term: 'widely regarded as', tag: 'puffery-attribution' },
+  { term: 'studies show', tag: 'puffery-attribution' },
 ];
 
 // A spec/brief `key:` or `key: value` line -- render/*/render.py's own
@@ -2559,7 +2607,7 @@ function selfTest() {
     const rl = gateReport(repLong, null);
     assert.ok(rl.words > 200, 'fixture is past the first bucket');
     assert.strictEqual(rl.rewrite_cap, 6, 'so the cap is two buckets, not one');
-    assert.strictEqual(rl.model_owned.length, 7, 'and the judged tells are named, not implied clean');
+    assert.strictEqual(rl.model_owned.length, 12, 'and the judged tells are named, not implied clean');
 
     // ---------------------------------------------- gate --report: lock 5
     //
