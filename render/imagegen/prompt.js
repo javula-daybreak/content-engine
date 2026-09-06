@@ -20,8 +20,15 @@
 // Keys whose `key:` line opens a `- ` bullet list. The union of the two retired
 // parsers' LIST_KEYS: one parser serves both formats because the grammar is one
 // grammar, and a key that never appears in a format costs nothing.
+//
+// `sections`, `observations`, `quadrants` and `notes` are FOUR MORE than the
+// retired parsers carried. Every shipped example writes them as one
+// semicolon-separated scalar, which still parses (as a one-element list), but
+// the retired parsers routed any `- ` bullet under them into `items` instead,
+// silently corrupting the item count on four archetypes that require both.
+// They are list-shaped in `REQUIRED`, so they are list keys here.
 const LIST_KEYS = new Set(['items', 'left', 'right', 'col1', 'col2', 'col3',
-  'stats', 'sections', 'observations', 'notes', 'quadrants', 'series']);
+  'stats', 'sections', 'observations', 'quadrants', 'notes']);
 
 // `left:` / `right:` carry a title on the `key: value` line and collect their
 // bullets separately, which is the one place the carousel grammar diverges.
@@ -180,7 +187,12 @@ function renderItem(raw) {
   parts.forEach((part, i) => {
     if (part.includes(';')) {
       const subs = part.split(';').map(s => s.trim()).filter(Boolean);
-      out.push('sub-items ' + subs.map(s => JSON.stringify(s)).join(', '));
+      // `;` inside a piped compound field separates that field's sub-items. On
+      // a field with no pipe (`sections:`, `notes:`, `quadrants:`) it separates
+      // the field's own top-level entries, and calling those "sub-items" tells
+      // the model to nest three section headings under nothing.
+      out.push((parts.length > 1 ? 'sub-items ' : '')
+        + subs.map(s => JSON.stringify(s)).join(', '));
     } else {
       out.push((i === 0 ? '' : 'then ') + JSON.stringify(part));
     }
@@ -295,7 +307,7 @@ function buildPrompt(opts) {
   }
   if (note) {
     p.push('');
-    p.push('CORRECTION FROM A FAILED PREVIOUS ATTEMPT, WHICH OUTRANKS NOTHING ABOVE BUT MUST ALSO HOLD:');
+    p.push('CORRECTION FROM A FAILED PREVIOUS ATTEMPT. Everything above still applies; this must hold as well:');
     p.push(note);
   }
   return p.join('\n');

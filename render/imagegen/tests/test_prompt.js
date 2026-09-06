@@ -118,6 +118,22 @@ const CASES = {
     assert.ok(line.includes('sub-items "Validate", "never inside"'));
   },
 
+  'a semicolon list on an unpiped field is a list, not sub-items'() {
+    // `sections:` and `notes:` carry three top-level entries, not three
+    // sub-items of nothing. Every shipped example writes them this way.
+    const line = P.renderItem('What decides the form?; What stops a bad one?; Where does it render?');
+    assert.ok(!line.includes('sub-items'), 'top-level entries were labelled sub-items');
+    assert.ok(line.includes('"What decides the form?"'));
+    assert.ok(line.includes('"Where does it render?"'));
+  },
+
+  'a bullet under sections lands in sections, not in items'() {
+    const { blocks } = P.parseSpec(
+      ':: sourced-shelf\nsections:\n- One\n- Two\nitems:\n- A\n- B\n');
+    assert.deepEqual(blocks[0].sections, ['One', 'Two']);
+    assert.deepEqual(blocks[0].items, ['A', 'B']);
+  },
+
   'layout directives never enter the verbatim text contract'() {
     const { lines } = P.textLines({
       archetype: 'ranked-bars', headline: 'A claim', highlight_index: '2',
