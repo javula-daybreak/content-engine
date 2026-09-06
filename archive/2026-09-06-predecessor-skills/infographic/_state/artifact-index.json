@@ -1,0 +1,83 @@
+{
+  "skill": "gtm-content-infographic",
+  "root": "/Users/josephavula/.claude/skills/gtm-content-infographic",
+  "phases": {
+    "0": {
+      "disposition": "DONE",
+      "created": [
+        "render.py",
+        "assets/icons.py",
+        "assets/icons/ (23 PNGs)",
+        "assets/logo/ (mark.png, full-black.png, full-light.png)",
+        "fonts/manrope.css (base64 variable TTF)",
+        "themes/_base.css",
+        "themes/daybreak.css",
+        "archetypes/_smoke.html",
+        "examples/_smoke.md",
+        "examples/samples/_smoke.png"
+      ],
+      "modified": [],
+      "gate": "PASS — smoke PNG 2160x2700, palette + footer bar + mark verified"
+    },
+    "1": {
+      "disposition": "DONE",
+      "archetype": "numbered-steps",
+      "created": ["examples/wk02-numbered-steps.md", "examples/samples/wk02-numbered-steps.png"],
+      "modified": ["render.py (steps geometry + connector)", "themes/_base.css (rings/connector/pills)", "_state/spec-contract.md"],
+      "gate": "PASS at fix loop 2 (redesign: serpentine connector + double rings + pills + descriptive title + no eyebrow + light footer)"
+    },
+    "2": {
+      "disposition": "DONE",
+      "archetypes": ["card-grid", "comparison-panel"],
+      "created": [
+        "examples/wk02-card-grid.md",
+        "examples/samples/wk02-card-grid.png",
+        "examples/wk02-comparison-panel.md",
+        "examples/samples/wk02-comparison-panel.png"
+      ],
+      "modified": [
+        "render.py (cardgrid_html, compare_html, CORE_BUILDERS, REQUIRED)",
+        "themes/_base.css (.cardgrid/.card + .compare/.ccol/.crow/.verdict blocks)"
+      ],
+      "gate": "card-grid PASS (loop 3), comparison-panel PASS (loop 1); both 2160x2700, --check OK"
+    }
+  },
+    "3": {
+      "disposition": "DONE",
+      "archetypes": ["icon-list", "funnel", "hybrid-playbook", "annotated-diagram"],
+      "method": "4 isolated sub-agents (own scratch copies) -> orchestrator integrated sequentially",
+      "created": [
+        "examples/icon-list.md", "examples/samples/icon-list.png",
+        "examples/funnel.md", "examples/samples/funnel.png",
+        "examples/hybrid-playbook.md", "examples/samples/hybrid-playbook.png",
+        "examples/annotated-diagram.md", "examples/samples/annotated-diagram.png"
+      ],
+      "modified": [
+        "render.py (iconlist_html, funnel_html, playbook_html, diagram geometry+helpers+diagram_html, _has_icon, CORE_BUILDERS, REQUIRED, LIST_KEYS += stats)",
+        "themes/_base.css (.iconlist/.il*, .funnel/.f*, .pb-*, .diagram/.di* blocks)"
+      ],
+      "gate": "regression --check OK on all 7; all 4 new render 2160x2700; orchestrator visual gate PASS on all 4"
+    },
+    "4": {
+      "disposition": "DONE",
+      "created": [
+        "skill.md",
+        "reference/archetypes.md", "reference/method.md", "reference/themes.md"
+      ],
+      "gate": "skill auto-discovered (skill.md registered); workflow + layout-selection + ingestion documented; one example+sample per archetype"
+    },
+    "5": {
+      "disposition": "DONE",
+      "created": ["tests/test_render.py", "README.md",
+                  "memory/gtm-content-infographic-skill.md (+ MEMORY.md line)"],
+      "gate": "21 tests OK (parser, atoms, validator, builders, examples sweep, render smoke 2160x2700)",
+      "open_item": "CLAUDE.md router entry: ASK Joseph (skill works without it via auto-discovery)"
+    }
+  },
+  "memory_written": [
+    "infographic-skill-assets-from-brand-kit.md",
+    "credits-reset-5am-utah.md",
+    "gtm-content-infographic-skill.md"
+  ],
+  "tests": "tests/test_render.py — 21 tests, OK (run: python3 -m unittest discover -s tests)"
+}
