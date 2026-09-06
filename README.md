@@ -50,11 +50,21 @@ audience.
 /content-engine carousel <topic>         6 to 10 slide PDF
 /content-engine infographic <topic>      single image
 /content-engine article <topic>          newsletter edition, plus its carousel
+                                         (unlocks after 8 short posts shipped)
 /content-engine as <handle>              scopes one invocation, does not persist
 /content-engine inventory                top-up interview
 /content-engine review                   weekly reconcile, performance, learnings
 /content-engine retract <slug|item-id>   withdraw a fact or a piece
 ```
+
+**The article cap is real and it is the one surprise in that list.** An article
+needs 8 short posts shipped since the last one, so on a fresh profile three of
+the four formats are locked for roughly two months. It went unmarked here until
+2026-09-06, and all three dogfood testers hit it as a wall rather than a
+constraint: each invented a different workaround, and two wrote fictional runs
+into their own ledger to move the counter, which `SKILL.md` §4 forbids in as
+many words. A cap the reader knows about is a schedule. A cap they meet at the
+refusal is a reason to lie to the tool.
 
 Every command in that list routes to a file that exists, as of 2026-08-23. One
 command is deliberately not listed: `/content-engine connect`. It is never

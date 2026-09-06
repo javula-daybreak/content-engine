@@ -134,7 +134,13 @@ img { display:block; width:${P.CANVAS_W}px; height:${P.CANVAS_H}px }
 
   // The temp file lands in the OUTPUT directory, never in this one: PRD 1.3
   // puts every write a run makes inside profiles/<handle>/.
-  const tmp = path.join(path.dirname(outPdf), `.assemble-${process.pid}.html`);
+  // Both paths are resolved before they reach Chrome. `file://` accepts only an
+  // absolute path: given a relative one it loads nothing, prints one blank page
+  // and exits 0. Through the CLI `guardOut` had already resolved --out so this
+  // never fired, which is exactly the kind of latent break the page count below
+  // exists to catch — and did, on the first direct call.
+  const tmp = path.resolve(path.dirname(outPdf), `.assemble-${process.pid}.html`);
+  outPdf = path.resolve(outPdf);
   fs.writeFileSync(tmp, doc);
   try {
     execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--no-pdf-header-footer',
@@ -146,7 +152,31 @@ img { display:block; width:${P.CANVAS_W}px; height:${P.CANVAS_H}px }
   } finally {
     fs.rmSync(tmp, { force: true });
   }
-  say(`deck: ${outPdf}  ${pngs.length} pages`);
+
+  // Count what Chrome actually wrote, never what we asked it for. A nine-slide
+  // deck rendering eight pages and exiting 0 is the retired renderer's worst
+  // bug (dogfood T3-7, B F-30): a silently wrong artifact, published, with the
+  // missing slide invisible until a reader swipes off the end.
+  const written = pdfPageCount(outPdf);
+  if (written !== pngs.length) {
+    die(`deck: ${outPdf}\n`
+      + `PAGE COUNT MISMATCH: ${pngs.length} slide PNGs went in, ${written} `
+      + `page${written === 1 ? '' : 's'} came out.\nThe PDF is wrong and must not ship. `
+      + `Re-run --assemble; if it repeats, the Chrome print path is dropping pages.`);
+  }
+  say(`deck: ${outPdf}  ${written} pages, one per slide`);
+}
+
+/**
+ * Pages in a PDF, counted off the page objects themselves.
+ *
+ * `/Type /Page` with no trailing `s` is one page; `/Type /Pages` is the tree
+ * node that holds them. Stdlib only, and the file is read as latin1 so the
+ * binary streams cannot corrupt the scan.
+ */
+function pdfPageCount(file) {
+  const text = fs.readFileSync(file, 'latin1');
+  return (text.match(/\/Type\s*\/Page(?![sA-Za-z])/g) || []).length;
 }
 
 // --------------------------------------------------------------------------- //
@@ -336,8 +366,11 @@ async function main(argv) {
   return carousel(spec, opts);
 }
 
+// Assigned BEFORE main() runs. `render.js test` requires tests/test_prompt.js,
+// which requires this file back, so anything exported after the entry point
+// below is still `{}` when a test reaches for it.
+module.exports = { apiKey, loadTheme, guardOut, assemblePdf, pdfPageCount, parseArgs };
+
 if (require.main === module) {
   main(process.argv.slice(2)).catch(e => die(e.message));
 }
-
-module.exports = { apiKey, loadTheme, guardOut, assemblePdf, parseArgs };

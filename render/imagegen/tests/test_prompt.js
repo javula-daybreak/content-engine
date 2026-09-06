@@ -267,6 +267,23 @@ const CASES = {
     }
   },
 
+  'the PDF page counter counts pages and not the page tree'() {
+    // Guards the assembled deck: a nine-slide deck that prints eight pages and
+    // exits 0 is the retired renderer's worst bug. `/Type /Pages` is the tree
+    // node holding the pages and must never be counted as one of them.
+    const os = require('os'), fsx = require('fs'), px = require('path');
+    const { pdfPageCount } = require('../render.js');
+    const f = px.join(fsx.mkdtempSync(px.join(os.tmpdir(), 'pdfc-')), 'x.pdf');
+    fsx.writeFileSync(f,
+      '%PDF-1.4\n'
+      + '1 0 obj<</Type /Pages /Count 3 /Kids[2 0 R 3 0 R 4 0 R]>>endobj\n'
+      + '2 0 obj<</Type /Page\n/Parent 1 0 R>>endobj\n'
+      + '3 0 obj<</Type/Page /Parent 1 0 R>>endobj\n'
+      + '4 0 obj<</Type /Page /Parent 1 0 R>>endobj\n', 'latin1');
+    assert.equal(pdfPageCount(f), 3, 'three pages, and the /Pages node is not one');
+    fsx.rmSync(px.dirname(f), { recursive: true, force: true });
+  },
+
   'every archetype the checker knows has a prompt recipe'() {
     for (const format of ['infographic', 'carousel']) {
       for (const arch of Object.keys(P.REQUIRED[format])) {

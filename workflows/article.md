@@ -56,9 +56,22 @@ the format forever.
 | 10 or more | Print the count and proceed. |
 
 **The refusal follows PRD section 3's repurpose refusal and returns angles rather
-than a no.** Print `N short posts shipped since <slug>, cap is 8`, then three
-short-post angles read off live inventory state. The deficit is shipped cadence,
-not material, so the material stays usable in the same turn.
+than a no.** Print the count, then three short-post angles read off live
+inventory state. The deficit is shipped cadence, not material, so the material
+stays usable in the same turn.
+
+**The count line has two forms, and the second one is the common case.**
+
+| Prior article exists | Print |
+| :- | :- |
+| Yes | `N short posts shipped since <that article's slug>, cap is 8` |
+| No | `N short posts shipped, cap is 8. No article has been written yet.` |
+
+**Corrected 2026-09-06.** This said only the first form. The path that triggers
+the refusal on a new profile is the path where **no article exists**, so the
+slot had nothing to fill it and the engine printed a literal `<slug>` at a
+human. All three dogfood testers reached this line; it is the first thing the
+article path ever says to a new user, and it said it in template syntax.
 
 ## The shape
 

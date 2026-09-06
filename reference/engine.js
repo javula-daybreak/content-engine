@@ -782,10 +782,19 @@ function overlap(draftPath, profile) {
   const isExempt = text => isExemptKey(words(text).join(' '));
 
   // The diff corpus: the last 20 shipped pieces, plus pre-engine posts.
+  //
+  // The run this draft belongs to is EXCLUDED. Without that filter a redraft is
+  // compared against the piece it is a redraft of: the gate mandates a rewrite,
+  // a rewrite is by construction mostly the same sentences, and lock 5 then
+  // hard-fails it at ~0.917 against its own source. Two rules that no legal
+  // artifact could satisfy at once — the 2026-08-25 dogfood hit it as T2-4/T3-3.
+  // A run directory is the draft's own iff it is the directory holding it.
+  const selfSlug = path.basename(path.dirname(path.resolve(draftPath)));
   const priors = [];
   const runsDir = path.join(profile, 'runs');
   const shippedDirs = listDirs(runsDir)
     .filter(n => /^\d{4}-\d{2}-\d{2}-/.test(n))
+    .filter(n => n !== selfSlug)
     .filter(n => fs.existsSync(path.join(runsDir, n, 'shipped.md')))
     .sort();
   for (const name of shippedDirs.slice(-PRIOR_LIMIT)) {
@@ -2725,6 +2734,34 @@ function selfTest() {
     assert.strictEqual(rOvWarn.overlap.pass, true, 'and lock 5 clears');
     assert.strictEqual(rOvWarn.gate_passes, true, 'so a warning does not fail the gate');
     assert.strictEqual(rOvWarn.action, 'none', 'and sends the run nowhere');
+
+    // The redraft trap: a run compared against its OWN shipped output. The gate
+    // mandates a redraft, a redraft is by construction mostly the same
+    // sentences, and until 2026-09-06 lock 5 then failed it against the piece
+    // it came from — two mandates no legal artifact could satisfy at once.
+    // The draft here sits INSIDE the run directory whose shipped.md it repeats.
+    // The self run's span must be DISTINCT from the other prior's, or the two
+    // failures dedupe to one and the assertions below pass either way. That
+    // tautology is how the first version of this test went green against the
+    // unfixed code.
+    const SELFRUN = 'the quarterly deck gets rebuilt from scratch by three different people every single time';
+    const selfRun = path.join(lock5, 'runs', '2026-03-09-self');
+    writeFixture(lock5, 'runs/2026-03-09-self/shipped.md',
+      'A first line that shares nothing.\n\n' + SELFRUN + '.\n');
+    writeFixture(lock5, 'inventory.md',
+      '## Items\n\n- id: unrelated\n  content: A different sentence about pallets.\n' +
+      '  clearance: public\n');
+    // The draft repeats BOTH spans and lives inside the 2026-03-09-self dir.
+    const selfDraft = writeFixture(selfRun, 'draft.md',
+      'Acme shipped 41 units in March 2026.\n\n' + SELFRUN + '.\n\n'
+      + LOCKRUN + '.\n\n' + REPBODY + HELD);
+    const rSelf = gateReport(selfDraft, lock5);
+    assert.ok(!rSelf.overlap.failures.some(f => f.prior === '2026-03-09-self'),
+      'a draft is never compared against its own run\'s shipped.md');
+    assert.ok(rSelf.overlap.failures.some(f => f.prior === '2026-03-02-prior'),
+      'while an unrelated prior still fails: the exclusion is a filter, not a mute');
+    assert.strictEqual(rSelf.overlap.failures.length, 1,
+      'exactly one prior catches it, and it is not the run\'s own');
 
     // No profile, no corpus. This must not read as a clean lock 5, which is
     // the same failure shape as "fires: 0" over an empty negative control.
