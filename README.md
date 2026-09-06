@@ -20,9 +20,20 @@ next line — `/content-engine setup` — then failed with `Unknown skill`, so a
 six-line README had both of its lines broken. `cp -R .` resolves against where
 you already are.
 
-**Copy it again after every change.** `/content-engine` reads the copy under
-`~/.claude/skills/`, never this folder, so edits here do nothing until you
-re-run the line above.
+**Update it after every change**, with this line rather than the install one:
+
+```
+rsync -a --delete --exclude='.git' -f'P profiles/' ./ ~/.claude/skills/content-engine/
+```
+
+`/content-engine` reads the copy under `~/.claude/skills/`, never this folder,
+so edits here do nothing until you run that. Three things it does that a second
+`cp -R` does not: it **deletes** files you removed here, which is how a retired
+renderer lingers in the installed copy for two weeks; it **protects
+`profiles/`**, so a profile you set up through the installed skill is never
+overwritten by this folder's; and it is silent, where `cp -R` over an existing
+copy prints a screen of `Permission denied` for every read-only git object and
+buries anything real.
 
 The interview is the only setup step, and it is a conversation rather than a
 form. Nothing is hand-edited to get started and no connector is ever required.
