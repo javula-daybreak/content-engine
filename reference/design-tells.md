@@ -14,15 +14,33 @@ different words, it says so.
 
 ## What it reads, and what it never reads
 
-**Rendered HTML, as text.** Never a screenshot. PRD section 4 prices one
-1080x1350 image at roughly 1,900 tokens every time it is looked at, and a whole
-deck's budget goes on looking at what the HTML already says in words. Both
-renderers keep the generated HTML beside their output for exactly this reason:
-`render/infographic/render.py` writes `final.png.html`, `render/carousel/render.py`
-writes `deck.html`.
+**Changed 2026-09-06: the generated image itself.** This section used to read:
 
-**The PNG or the PDF is read back at most once**, after this gate is clean, and
-only where the geometry cannot be settled from the markup.
+> **Rendered HTML, as text.** Never a screenshot. PRD section 4 prices one
+> 1080x1350 image at roughly 1,900 tokens every time it is looked at, and a whole
+> deck's budget goes on looking at what the HTML already says in words. Both
+> renderers keep the generated HTML beside their output for exactly this reason:
+> `render/infographic/render.py` writes `final.png.html`, `render/carousel/render.py`
+> writes `deck.html`.
+>
+> **The PNG or the PDF is read back at most once**, after this gate is clean, and
+> only where the geometry cannot be settled from the markup.
+
+Both renderers were replaced by `render/imagegen/`, which calls an
+image-generation model. **There is no HTML.** The image is the only artifact, so
+this gate reads the image, once per frame, before the human sees it. PRD section
+4's token argument is unchanged and still correct; the cheaper alternative it
+recommended no longer exists, and the cost increase is accepted rather than
+hidden. The five-item checklist that runs alongside these entries is in
+`docs/superpowers/specs/2026-09-06-imagegen-infographics-design.md` section 5.2,
+and in the step 6 section of each workflow file.
+
+**Every entry below is unchanged.** Only the artifact they are read against
+changed, and an entry that named HTML as its evidence now names the pixels. Two
+entries lost their mechanical backstop when `check_layout` was archived —
+contrast and thumbnail legibility are read by eye on both paths now, where the
+infographic path used to have them measured. A frame shipping without them
+mechanically checked says so.
 
 **This file serves both visual paths.** No entry may assume a single frame. An
 entry tagged `[carousel]` is read per slide *and* across the deck; an entry
@@ -778,3 +796,15 @@ and the move is recorded below.
   and the upgrade path. The contrast check found and fixed one live failure in a
   shipped template on the day it was built: `--muted` stat labels on the tinted
   band measured 2.91:1 at 19px.
+- **2026-09-06.** **The gate reads the image, not the markup.** Both HTML
+  renderers were replaced by `render/imagegen/`, which calls an image-generation
+  model, so there is no `final.png.html` and no `deck.html` to read instead of
+  the picture. **No entry changed and no entry was added or removed**: the rules
+  are the rules and only their evidence moved. Two entries lost the mechanical
+  backstop the previous line records — contrast and thumbnail legibility are
+  read by eye on both paths now. A five-item verbatim-text and artifact
+  checklist runs alongside these entries on every frame; it lives in each
+  workflow's step 6 and in
+  `docs/superpowers/specs/2026-09-06-imagegen-infographics-design.md` section
+  5.2, not here, because it checks the render against the spec rather than
+  against taste.

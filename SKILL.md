@@ -73,17 +73,30 @@ A format workflow that reimplements one of them is a bug.
 
 **On a visual run, `draft.md` is the render spec.** Added 2026-08-20, when both
 renderers were vendored and this was true in two workflow files and stated in
-none. Step 4 writes the Markdown spec `render.py` consumes, so step 5's gate
-reads every word that reaches the canvas and no separate copy of the on-slide
-text exists to drift from it. Two consequences: the renderers judge layout only
-and never language, and the generated HTML is a build artifact nobody hand-edits,
-because an edit there ships an image the gate never saw.
+none. Step 4 writes the Markdown spec `render/imagegen/render.js` consumes, so
+step 5's gate reads every word that reaches the canvas and no separate copy of
+the on-slide text exists to drift from it. Two consequences: the renderer judges
+spec grammar only and never language, and the rendered image is a build artifact
+nobody hand-edits, because an edit there ships an image the gate never saw.
 
 **Step 6 writes `runs/<slug>/design-gate.md`** and step 7 does not run before it
-exists, which mirrors step 5's own existence check. The gate reads the generated
-HTML as text rather than a screenshot, per PRD §4's cost argument; the rules are
-PRD §10.3 and `VISUALS.md` §5, and `reference/design-tells.md` is named by PRD
-§1.2 and §3 but is not built.
+exists, which mirrors step 5's own existence check. The rules are PRD §10.3,
+`VISUALS.md` §5, and `reference/design-tells.md`, which PRD §1.2 and §3 name and
+which has been built since 2026-08-24.
+
+**Changed 2026-09-06: the gate reads the image.** It used to read the generated
+HTML as text, per PRD §4's cost argument. `render/imagegen/` replaced the HTML
+renderers, so there is no markup to read instead of the picture. The cost
+increase is real and accepted; PRD §4 records it. Two knock-on effects on this
+table, neither of which changes a row:
+
+- **Step 6 and step 7 interleave on the carousel path.** The cover slide is
+  generated, gated, and only then are the rest generated and gated; step 7 is
+  the assembly of already-gated slides into `deck.pdf`. The cover is every other
+  slide's reference image, which is why it cannot wait for the others.
+- **Step 7 costs money.** Roughly $0.05 an image, printed per call off
+  OpenRouter's own `cost` field and recorded in `design-gate.md`. It is the
+  first step in this pipeline that does.
 
 ### Step 1: load
 

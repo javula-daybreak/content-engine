@@ -11,11 +11,19 @@ copy of the directory rather than a clone; the line was `git clone <url>` until
 whole explanation is the explanation failing.
 
 The interview is the only setup step, and it is a conversation rather than a
-form. Nothing is hand-edited to get started, no credential is entered anywhere,
-and no connector is ever required.
+form. Nothing is hand-edited to get started and no connector is ever required.
+
+**One credential, and only for images. Changed 2026-09-06.** This used to say
+"no credential is entered anywhere," and that stayed true for every text format
+and is still true for them. The visual formats now call an image-generation
+model, which needs an API key: put `OPENROUTER_API_KEY=<key>` in a `.env` file
+at the repo root, which is gitignored. Nothing reads it but
+`render/imagegen/render.js`, and nothing else in the engine needs a credential
+of any kind. Image generation costs real money, roughly $0.05 an image; the
+renderer prints what each call cost.
 
 What you copy is the whole engine. Every workflow, every reference file, every
-config template, and both renderers ship already wired to each other. Setup adds
+config template, and the renderer ship already wired to each other. Setup adds
 nothing but answers: your inventory, your voice, your thesis, your identity, your
 audience.
 
@@ -60,13 +68,17 @@ is the only profile in the repo, and it is empty. Nothing fictional ships here.
 
 ## Requirements
 
-Claude Code. Node for the deterministic checks (`reference/engine.js`, no npm
-packages). Python 3 and a headless Chrome for the two renderers, both stdlib
-only. **Nothing to install, ever** — no `npm install`, no `pip install`, no
-Playwright, which is the whole point of PRD §1.3 and the reason the renderers are
-vendored Python instead of a Node render pipeline. Corrected 2026-08-20: this
-section promised an `npm install` that was never possible, since no
-`package.json` was ever written.
+Claude Code. Node for the deterministic checks (`reference/engine.js`) and for
+the renderer (`render/imagegen/`), both stdlib only and neither with a
+`package.json`. A headless Chrome, which the renderer drives to print a carousel
+deck to PDF and installs nothing to do. An OpenRouter API key in `.env`, for the
+visual formats only. **Nothing to install, ever** — no `npm install`, no
+`pip install`, no Playwright, which is the whole point of PRD §1.3.
+
+Corrected 2026-08-20: this section once promised an `npm install` that was never
+possible, since no `package.json` was ever written. Updated 2026-09-06: Python 3
+is no longer required. The two vendored Python renderers were replaced by
+`render/imagegen/`, and they are in `archive/2026-09-06-html-renderers/`.
 
 ## Spec
 
